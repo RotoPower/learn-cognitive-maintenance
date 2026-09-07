@@ -1,0 +1,6 @@
+data/sim/
+data/derived/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc

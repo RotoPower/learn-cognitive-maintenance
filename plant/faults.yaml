@@ -1,0 +1,30 @@
+seed: 42
+start: 2024-01-01
+horizon_days: 365
+scenarios:
+  - asset: BFP-2
+    mode: bearing_wear
+    onset_day: 240
+    duration_days: 30
+  - asset: GT-1
+    mode: compressor_fouling
+    onset_day: 270
+    duration_days: 60
+  - asset: CTF-1
+    mode: gearbox_wear
+    onset_day: 300
+    duration_days: 25
+  - asset: BFP-1
+    event: sensor_outage
+    from_day: 200
+    to_day: 203
+
+# Realism quirks applied by generate(). Real historian exports have all of these;
+# the data pipeline is expected to find them.
+quirks:
+  dead_tags:
+    - GT1.BRG_TEMP_2          # transmitter failed, constant for the whole horizon
+  missing_hours:
+    - {from_day: 131, hours: 5}   # historian gap: 5 consecutive hourly rows absent
+  duplicated_timestamps:
+    - {day: 87, hour: 14}         # one row exported twice with identical values

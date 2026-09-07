@@ -1,0 +1,2 @@
+- [Dataset quirks in data/sim](data/dataset_quirks_sim.md) — exact dates for dead tag, outage, missing hours, dup ts, fault onsets; no raw dir/plantctl exists
+- [prepare_anomaly_table.py script](data/prepare_anomaly_table_script.md) — reusable fleet anomaly table builder, design choices for PLANT.LOAD/dedup/dead-tag/gaps

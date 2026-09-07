@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash|Write|Edit",
+        "hooks": [{ "type": "command", "command": "bash scripts/guard-raw-data.sh" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "bash scripts/lint-test.sh" }] }
+    ]
+  }
+}
