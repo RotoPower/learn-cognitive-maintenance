@@ -1,0 +1,25 @@
+{
+  "name": "plant-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker port of plant/api.py: deterministic simulator, Durable Object clock, D1 tables",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:staging": "wrangler deploy --env staging",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "d1:migrate:local": "wrangler d1 migrations apply plant --local",
+    "d1:migrate:staging": "wrangler d1 migrations apply plant-staging --env staging --remote"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.129.0"
+  }
+}

@@ -1,0 +1,65 @@
+# Plant API Worker. Top-level settings are used by `wrangler dev` and vitest;
+# [env.staging] / [env.production] have SEPARATE D1 databases and DO namespaces.
+name = "plant-api"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+PLANT_CLOCK_START = "2024-09-01T00:00:00"
+PLANT_CLOCK_SPEED = "60"
+
+# Tokens are secrets: `wrangler secret put READ_TOKEN --env staging` (and ADMIN_TOKEN).
+# For local dev put them in .dev.vars (see .dev.vars.example).
+
+[[durable_objects.bindings]]
+name = "CLOCK"
+class_name = "Clock"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Clock"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plant-local"
+database_id = "00000000-0000-0000-0000-000000000000"   # local only; wrangler dev/vitest use Miniflare
+migrations_dir = "migrations"
+
+# ---------------------------------------------------------------- staging
+[env.staging]
+name = "plant-api-staging"
+vars = { PLANT_CLOCK_START = "2024-09-01T00:00:00", PLANT_CLOCK_SPEED = "60" }
+
+[[env.staging.durable_objects.bindings]]
+name = "CLOCK"
+class_name = "Clock"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_sqlite_classes = ["Clock"]
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "plant-staging"
+database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-staging"
+migrations_dir = "migrations"
+
+# ------------------------------------------------------------- production
+[env.production]
+name = "plant-api"
+vars = { PLANT_CLOCK_START = "2024-09-01T00:00:00", PLANT_CLOCK_SPEED = "60" }
+
+[[env.production.durable_objects.bindings]]
+name = "CLOCK"
+class_name = "Clock"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["Clock"]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "plant-production"
+database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-production"
+migrations_dir = "migrations"

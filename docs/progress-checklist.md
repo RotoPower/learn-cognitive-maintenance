@@ -60,7 +60,7 @@ Legend: `[x]` done and verified · `[~]` partly done · `[ ]` not started · **?
 
 ## Part D — Cloudflare
 
-- [ ] D2.1 port `plant/sim.py` to a Worker + Durable Object clock + D1 schema (`apps/plant-api/`)
+- [~] D2.1 port `plant/sim.py` to a Worker + Durable Object clock + D1 schema (`apps/plant-api/`): **built and tested locally**. `src/sim.ts` reproduces the Python sim bit-for-bit (blake2b over the same key strings; 828-sample parity fixture from `scripts/export_parity_fixture.py`), `src/clock.ts` is the Clock DO (anchor + speed, computed on read), `migrations/0001_schema.sql` has all D1 tables, `src/index.ts` serves the same routes/tokens as `plant/api.py`. 27 vitest tests in workerd (Miniflare D1 + DO). `wrangler deploy --dry-run --env staging` bundles. **Remaining, yours**: `wrangler login`, `wrangler d1 create plant-staging` (+ paste id), migrate, `wrangler secret put READ_TOKEN/ADMIN_TOKEN --env staging`, `npm run deploy:staging` (see `apps/plant-api/README.md`)
 - [ ] D2.2 ingest Worker
 - [ ] D2.3 artefact upload to D1
 - [ ] D2.4 scoring Worker
