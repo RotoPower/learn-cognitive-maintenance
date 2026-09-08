@@ -17,6 +17,13 @@ try:
 except Exception:
     sys.exit(0)
 
+_dbg = os.path.join(os.environ.get("TEMP") or os.environ.get("TMPDIR") or "/tmp", "plant-hook-debug.jsonl")
+try:  # TEMP diagnostic (remove once agent_type gating is confirmed)
+    with open(_dbg, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({k: (v if k != "tool_input" else {"command": str(v.get("command", ""))[:80]}) for k, v in payload.items()}) + "\n")
+except Exception:
+    pass
+
 if payload.get("tool_name") != "Bash":
     sys.exit(0)
 # Installed both in the modeler's frontmatter and project-wide in .claude/settings.json.
