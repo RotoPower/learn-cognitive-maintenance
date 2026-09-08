@@ -19,6 +19,13 @@ except Exception:
 
 if payload.get("tool_name") != "Bash":
     sys.exit(0)
+# Installed both in the modeler's frontmatter and project-wide in .claude/settings.json.
+# Project-wide, only act when the caller is the modeler subagent (hook payload carries agent_type).
+agent = payload.get("agent_type")
+if agent is not None and agent != "modeler":
+    sys.exit(0)
+if agent is None and os.environ.get("BLOCK_PLANT_API_SCOPE", "modeler") == "modeler":
+    sys.exit(0)  # main session (no agent_type): not the modeler, allow
 cmd = str((payload.get("tool_input") or {}).get("command", ""))
 
 API_CLIENTS = re.compile(

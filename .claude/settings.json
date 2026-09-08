@@ -2,7 +2,9 @@
   "hooks": {
     "PreToolUse": [
       { "matcher": "Bash|Write|Edit",
-        "hooks": [{ "type": "command", "command": "bash scripts/guard-raw-data.sh" }] }
+        "hooks": [{ "type": "command", "command": "bash scripts/guard-raw-data.sh" }] },
+      { "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "bash scripts/block-plant-api.sh" }] }
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write",

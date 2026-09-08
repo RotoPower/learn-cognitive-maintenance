@@ -17,8 +17,7 @@ except Exception:
     sys.exit(0)  # unparseable payload: do not block
 
 tool = payload.get("tool_name", "")
-inp = payload.get("tool_input", {}) or {}
-SEP = r"[/\\]"  # forward or back slash
+inp = payload.get("tool_input", {}) or {}SEP = r"[/\\]"  # forward or back slash
 RAW = re.compile(r"data" + SEP + r"+raw(?=" + SEP + r"|$|[^A-Za-z0-9_])", re.I)
 
 
