@@ -217,7 +217,13 @@ def train(
     cols = feature_columns(table)
     tr, te = split(table, cutoff, horizon_days)
     if tr.empty or tr["label"].sum() == 0:
-        raise ValueError("training split has no positive labels; move the cutoff later")
+        pos = table.loc[table["label"] == 1, "timestamp"]
+        first_pos = pos.min().date() if not pos.empty else None
+        raise ValueError(
+            f"training split has no positive labels: cutoff {cutoff.date()} minus the {horizon_days}-day embargo "
+            f"ends training at {(cutoff - pd.Timedelta(days=horizon_days)).date()}, but the first positive label is "
+            f"{first_pos}. Set cutoff to at least {first_pos + pd.Timedelta(days=horizon_days + 7) if first_pos else 'a later date'}."
+        )
 
     scaler = Scaler.fit(tr[cols].to_numpy(float))
     Xtr = scaler.transform(tr[cols].to_numpy(float))
