@@ -1,0 +1,47 @@
+# Ingest Worker: cron every real minute -> one sim-hour row per tag in D1 `readings`.
+# Shares the plant-api D1 database (same database_id per environment); schema is
+# owned and migrated by apps/plant-api.
+name = "plant-ingest"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
+MAX_BACKFILL_HOURS = "168"
+
+# Secrets: READ_TOKEN (plant API read token) and ADMIN_TOKEN (for POST /ingest manual trigger)
+# -> `wrangler secret put READ_TOKEN --env staging`; locally in .dev.vars
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plant-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# ---------------------------------------------------------------- staging
+[env.staging]
+name = "plant-ingest-staging"
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168" }
+
+[env.staging.triggers]
+crons = ["* * * * *"]
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "plant-staging"
+database_id = "f639c0e5-a838-4d97-8b87-3f4328d1758f"
+
+# ------------------------------------------------------------- production
+[env.production]
+name = "plant-ingest"
+vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168" }
+
+[env.production.triggers]
+crons = ["* * * * *"]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "plant-production"
+database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-production"
