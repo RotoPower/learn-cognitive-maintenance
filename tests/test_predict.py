@@ -306,5 +306,6 @@ def test_cli_end_to_end(long: pd.DataFrame, plant: Plant, tmp_path: Path, monkey
     out = capsys.readouterr().out
     assert "BFP2" in out.splitlines()[2] and Path("rep/predict_2025-03-05.md").exists()
 
+    monkeypatch.delenv("PLANT_ADMIN_TOKEN", raising=False)
     with pytest.raises(SystemExit):
         cli.main(["upload", "--artifact", "nope", "--url", "http://x"])  # no token set

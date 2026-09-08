@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from plant import sim
@@ -197,18 +198,21 @@ def create_app(
 
     # ----- auth ------------------------------------------------------------ #
 
-    def _token(request: Request) -> str | None:
-        auth = request.headers.get("authorization", "")
-        if auth.lower().startswith("bearer "):
-            return auth[7:].strip()
+    # HTTPBearer registers a security scheme so Swagger (/docs) shows an
+    # "Authorize" button. auto_error=False keeps the X-API-Key fallback working.
+    bearer = HTTPBearer(auto_error=False, description="READ or ADMIN token")
+
+    def _token(request: Request, creds: HTTPAuthorizationCredentials | None) -> str | None:
+        if creds is not None:
+            return creds.credentials.strip()
         return request.headers.get("x-api-key")
 
-    def require_read(request: Request) -> None:
-        if _token(request) not in (read_token, admin_token):
+    def require_read(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(bearer)) -> None:
+        if _token(request, creds) not in (read_token, admin_token):
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "READ or ADMIN token required")
 
-    def require_admin(request: Request) -> None:
-        if _token(request) != admin_token:
+    def require_admin(request: Request, creds: HTTPAuthorizationCredentials | None = Depends(bearer)) -> None:
+        if _token(request, creds) != admin_token:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "ADMIN token required")
 
     READ = [Depends(require_read)]

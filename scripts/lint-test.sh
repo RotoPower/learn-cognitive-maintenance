@@ -4,9 +4,20 @@
 # is seen immediately instead of at the end of the task. Non-Python files: no-op.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-if   [ -x "$ROOT/.venv/Scripts/python.exe" ]; then PY="$ROOT/.venv/Scripts/python.exe"
-elif [ -x "$ROOT/.venv/bin/python" ];        then PY="$ROOT/.venv/bin/python"
-else PY="uv run --project $ROOT python"; fi
+# In an agent worktree (.claude/worktrees/<agent>) there is no .venv; use the main
+# checkout's venv (via git's common dir), then any system python. Never fall back to
+# `uv run`, which would have to build a venv and makes the hook fail open.
+MAIN="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; MAIN="${MAIN%/.git}"
+PY=""
+for c in "$ROOT/.venv/Scripts/python.exe" "$ROOT/.venv/bin/python" "$MAIN/.venv/Scripts/python.exe" "$MAIN/.venv/bin/python"; do
+  [ -n "$c" ] && [ -x "$c" ] && { PY="$c"; break; }
+done
+if [ -z "$PY" ]; then
+  for c in python python3 py; do
+    if "$c" -c "import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)" >/dev/null 2>&1; then PY="$c"; break; fi
+  done
+fi
+if [ -z "$PY" ]; then echo "hook: no python interpreter found; refusing to fail open" >&2; exit 2; fi
 path="$($PY -c 'import json,sys
 try: print((json.load(sys.stdin).get("tool_input") or {}).get("file_path",""))
 except Exception: print("")')"

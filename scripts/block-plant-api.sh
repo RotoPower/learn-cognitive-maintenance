@@ -5,9 +5,20 @@
 # Exit 2 = block; stderr goes back to the agent.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-if   [ -x "$ROOT/.venv/Scripts/python.exe" ]; then PY="$ROOT/.venv/Scripts/python.exe"
-elif [ -x "$ROOT/.venv/bin/python" ];        then PY="$ROOT/.venv/bin/python"
-else PY="uv run --project $ROOT python"; fi
+# In an agent worktree (.claude/worktrees/<agent>) there is no .venv; use the main
+# checkout's venv (via git's common dir), then any system python. Never fall back to
+# `uv run`, which would have to build a venv and makes the hook fail open.
+MAIN="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; MAIN="${MAIN%/.git}"
+PY=""
+for c in "$ROOT/.venv/Scripts/python.exe" "$ROOT/.venv/bin/python" "$MAIN/.venv/Scripts/python.exe" "$MAIN/.venv/bin/python"; do
+  [ -n "$c" ] && [ -x "$c" ] && { PY="$c"; break; }
+done
+if [ -z "$PY" ]; then
+  for c in python python3 py; do
+    if "$c" -c "import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)" >/dev/null 2>&1; then PY="$c"; break; fi
+  done
+fi
+if [ -z "$PY" ]; then echo "hook: no python interpreter found; refusing to fail open" >&2; exit 2; fi
 HOOK_PAYLOAD="$(cat)"; export HOOK_PAYLOAD
 exec $PY - <<'PYEOF'
 import json, os, re, sys
@@ -16,13 +27,6 @@ try:
     payload = json.loads(os.environ.get("HOOK_PAYLOAD", ""))
 except Exception:
     sys.exit(0)
-
-_dbg = os.path.join(os.environ.get("TEMP") or os.environ.get("TMPDIR") or "/tmp", "plant-hook-debug.jsonl")
-try:  # TEMP diagnostic (remove once agent_type gating is confirmed)
-    with open(_dbg, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({k: (v if k != "tool_input" else {"command": str(v.get("command", ""))[:80]}) for k, v in payload.items()}) + "\n")
-except Exception:
-    pass
 
 if payload.get("tool_name") != "Bash":
     sys.exit(0)

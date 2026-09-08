@@ -1,0 +1,372 @@
+{
+  "run_id": "anomaly_fleet_2024-11-22_r1",
+  "task": "anomaly",
+  "target": "fleet",
+  "as_of": "2024-11-22T00:00:00",
+  "window": {
+    "start": "2024-11-15T00:00:00",
+    "end": "2024-11-22T00:00:00",
+    "days": 7
+  },
+  "seed": 42,
+  "config": {
+    "baseline_days": 30,
+    "min_periods_hours": 480,
+    "z_threshold": 3.0,
+    "min_run_hours": 6,
+    "window_days": 7,
+    "target_assets": [
+      "GT1",
+      "BFP1",
+      "BFP2",
+      "CTF1"
+    ]
+  },
+  "input": {
+    "parquet": "data/derived/anomaly_fleet_2024-11-22.parquet",
+    "sidecar": "data/derived/anomaly_fleet_2024-11-22.meta.json",
+    "dead_tags": [
+      "GT1.BRG_TEMP_2"
+    ],
+    "outage_windows": []
+  },
+  "flags": [
+    {
+      "first_flag_ts": "2024-11-15T12:00:00",
+      "last_flag_ts": "2024-11-15T21:00:00",
+      "hours_flagged": 10,
+      "severity": 3.9865490383039446,
+      "z_peak_signed": 3.9865490383039446,
+      "z_at_end": 3.179754276313528,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-17T12:00:00",
+      "last_flag_ts": "2024-11-17T21:00:00",
+      "hours_flagged": 10,
+      "severity": 3.5220492036065307,
+      "z_peak_signed": 3.5220492036065307,
+      "z_at_end": 3.1159825782591106,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-18T11:00:00",
+      "last_flag_ts": "2024-11-18T23:00:00",
+      "hours_flagged": 13,
+      "severity": 3.87555353177404,
+      "z_peak_signed": 3.87555353177404,
+      "z_at_end": 3.1197413939536527,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-19T10:00:00",
+      "last_flag_ts": "2024-11-20T00:00:00",
+      "hours_flagged": 15,
+      "severity": 3.615184247969972,
+      "z_peak_signed": 3.615184247969972,
+      "z_at_end": 3.0891468799675628,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-20T08:00:00",
+      "last_flag_ts": "2024-11-20T20:00:00",
+      "hours_flagged": 13,
+      "severity": 3.4259498342237946,
+      "z_peak_signed": 3.4259498342237946,
+      "z_at_end": 3.054078023708563,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-15T00:00:00",
+      "last_flag_ts": "2024-11-15T06:00:00",
+      "hours_flagged": 7,
+      "severity": 4.680083208954349,
+      "z_peak_signed": 4.680083208954349,
+      "z_at_end": 4.680083208954349,
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "interpretation": "fan vibration rising: late gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-15T09:00:00",
+      "last_flag_ts": "2024-11-15T16:00:00",
+      "hours_flagged": 8,
+      "severity": 4.109583523082654,
+      "z_peak_signed": 4.109583523082654,
+      "z_at_end": 4.0660209076133675,
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "interpretation": "fan vibration rising: late gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-16T13:00:00",
+      "last_flag_ts": "2024-11-17T05:00:00",
+      "hours_flagged": 17,
+      "severity": 4.649448195096825,
+      "z_peak_signed": 4.649448195096825,
+      "z_at_end": 3.5742578512269825,
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "interpretation": "fan vibration rising: late gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-17T07:00:00",
+      "last_flag_ts": "2024-11-17T19:00:00",
+      "hours_flagged": 13,
+      "severity": 4.317502555991259,
+      "z_peak_signed": 4.317502555991259,
+      "z_at_end": 3.5717925463487954,
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "interpretation": "fan vibration rising: late gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-17T21:00:00",
+      "last_flag_ts": "2024-11-21T00:00:00",
+      "hours_flagged": 76,
+      "severity": 4.23542831577683,
+      "z_peak_signed": 4.23542831577683,
+      "z_at_end": 3.5231619164535375,
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "interpretation": "fan vibration rising: late gearbox_wear symptom"
+    }
+  ],
+  "per_asset": {
+    "CTF1": {
+      "n_flags": 10,
+      "max_severity": 4.680083208954349,
+      "most_consistent_mode": "gearbox_wear",
+      "supporting_tags": [
+        "GBX_OIL_TEMP",
+        "VIB"
+      ],
+      "expected_symptom_tags": [
+        "GBX_OIL_TEMP",
+        "VIB",
+        "MOTOR_CURR"
+      ],
+      "unexplained_tags": []
+    }
+  },
+  "per_tag_stats": [
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.429052737751033,
+      "max_abs_z_in_window": 2.429052737751033
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.6183753303004895,
+      "max_abs_z_in_window": 2.2265666741336534
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2121458282264075,
+      "max_abs_z_in_window": 1.8889531222751483
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.060425669073193,
+      "max_abs_z_in_window": 1.9020487212498967
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.249073013505844,
+      "max_abs_z_in_window": 3.249073013505844
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.012206636647348,
+      "max_abs_z_in_window": 2.4118208871295965
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.662730558782101,
+      "max_abs_z_in_window": 2.5239727672364953
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.218552190087862,
+      "max_abs_z_in_window": 1.9374801160714672
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.1639810097392997,
+      "max_abs_z_in_window": 1.8301070770906687
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.157090928897965,
+      "max_abs_z_in_window": 1.8951742486973733
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.2815398934150326,
+      "max_abs_z_in_window": 2.9753130653839
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.408860394394699,
+      "max_abs_z_in_window": 2.7471004185763874
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.119727325353114,
+      "max_abs_z_in_window": 3.9865490383039446
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.9700516786747273,
+      "max_abs_z_in_window": 2.914035588308724
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.SPEED",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.938917592923787,
+      "max_abs_z_in_window": 2.938917592923787
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.680083208954349,
+      "max_abs_z_in_window": 4.680083208954349
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.BRG_TEMP_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.107669433563425,
+      "max_abs_z_in_window": 2.5692053967290662
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.CDP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.6325277295105733,
+      "max_abs_z_in_window": 2.6325277295105733
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.EXH_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.2521597221069123,
+      "max_abs_z_in_window": 2.593435159813836
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.FUEL_FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.278098266324627,
+      "max_abs_z_in_window": 1.894430053589458
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.LOAD_MW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.078012853208028,
+      "max_abs_z_in_window": 2.078012853208028
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.VIB_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.294336732714557,
+      "max_abs_z_in_window": 3.153935023704119
+    }
+  ],
+  "metrics": {
+    "n_flags": 10,
+    "n_assets_flagged": 1,
+    "n_tags_flagged": 2,
+    "n_tags_scored": 22,
+    "assets_flagged": [
+      "CTF1"
+    ]
+  },
+  "report": "reports/replay/anomaly_2024-11-22.md"
+}

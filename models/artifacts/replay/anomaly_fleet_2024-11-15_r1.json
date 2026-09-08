@@ -1,0 +1,305 @@
+{
+  "run_id": "anomaly_fleet_2024-11-15_r1",
+  "task": "anomaly",
+  "target": "fleet",
+  "as_of": "2024-11-15T00:00:00",
+  "window": {
+    "start": "2024-11-08T00:00:00",
+    "end": "2024-11-15T00:00:00",
+    "days": 7
+  },
+  "seed": 42,
+  "config": {
+    "baseline_days": 30,
+    "min_periods_hours": 480,
+    "z_threshold": 3.0,
+    "min_run_hours": 6,
+    "window_days": 7,
+    "target_assets": [
+      "GT1",
+      "BFP1",
+      "BFP2",
+      "CTF1"
+    ]
+  },
+  "input": {
+    "parquet": "data/derived/anomaly_fleet_2024-11-15.parquet",
+    "sidecar": "data/derived/anomaly_fleet_2024-11-15.meta.json",
+    "dead_tags": [
+      "GT1.BRG_TEMP_2"
+    ],
+    "outage_windows": []
+  },
+  "flags": [
+    {
+      "first_flag_ts": "2024-11-11T13:00:00",
+      "last_flag_ts": "2024-11-11T19:00:00",
+      "hours_flagged": 7,
+      "severity": 3.8448044416678173,
+      "z_peak_signed": 3.8448044416678173,
+      "z_at_end": 3.150495183310709,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-12T14:00:00",
+      "last_flag_ts": "2024-11-12T19:00:00",
+      "hours_flagged": 6,
+      "severity": 4.04206313612015,
+      "z_peak_signed": 4.04206313612015,
+      "z_at_end": 3.259011752484125,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-13T16:00:00",
+      "last_flag_ts": "2024-11-13T21:00:00",
+      "hours_flagged": 6,
+      "severity": 3.8559382161230205,
+      "z_peak_signed": 3.8559382161230205,
+      "z_at_end": 3.2926575237729527,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-11-14T14:00:00",
+      "last_flag_ts": "2024-11-14T20:00:00",
+      "hours_flagged": 7,
+      "severity": 4.119727325353106,
+      "z_peak_signed": 4.119727325353106,
+      "z_at_end": 3.632034334649729,
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+    }
+  ],
+  "per_asset": {
+    "CTF1": {
+      "n_flags": 4,
+      "max_severity": 4.119727325353106,
+      "most_consistent_mode": "gearbox_wear",
+      "supporting_tags": [
+        "GBX_OIL_TEMP"
+      ],
+      "expected_symptom_tags": [
+        "GBX_OIL_TEMP",
+        "VIB",
+        "MOTOR_CURR"
+      ],
+      "unexplained_tags": []
+    }
+  },
+  "per_tag_stats": [
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.8638883662934336,
+      "max_abs_z_in_window": 2.4048838327680593
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.6183753303004704,
+      "max_abs_z_in_window": 2.6183753303004704
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2121458282264057,
+      "max_abs_z_in_window": 2.2121458282264057
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.0604256690731924,
+      "max_abs_z_in_window": 2.0604256690731924
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.9725239401132293,
+      "max_abs_z_in_window": 2.9725239401132293
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.944303054661194,
+      "max_abs_z_in_window": 2.67882929795862
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.8524974179522102,
+      "max_abs_z_in_window": 2.662730558782111
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.6661252918645055,
+      "max_abs_z_in_window": 2.2185521900878764
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.163981009739302,
+      "max_abs_z_in_window": 2.163981009739302
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.157090928897961,
+      "max_abs_z_in_window": 2.157090928897961
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.279415803887414,
+      "max_abs_z_in_window": 3.2426756880076923
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.4387483202487625,
+      "max_abs_z_in_window": 2.6215809349764982
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.119727325353106,
+      "max_abs_z_in_window": 4.119727325353106
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.970051678674722,
+      "max_abs_z_in_window": 2.970051678674722
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.SPEED",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.8490026278636953,
+      "max_abs_z_in_window": 2.8490026278636953
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.533219758162316,
+      "max_abs_z_in_window": 4.533219758162316
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.BRG_TEMP_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.0724664805186617,
+      "max_abs_z_in_window": 3.0724664805186617
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.CDP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.5620569744023394,
+      "max_abs_z_in_window": 2.5620569744023394
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.EXH_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.252159722106768,
+      "max_abs_z_in_window": 3.252159722106768
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.FUEL_FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2780982663246183,
+      "max_abs_z_in_window": 2.2780982663246183
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.LOAD_MW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.0229245825260205,
+      "max_abs_z_in_window": 2.0229245825260205
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.VIB_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.294336732714567,
+      "max_abs_z_in_window": 3.294336732714567
+    }
+  ],
+  "metrics": {
+    "n_flags": 4,
+    "n_assets_flagged": 1,
+    "n_tags_flagged": 1,
+    "n_tags_scored": 22,
+    "assets_flagged": [
+      "CTF1"
+    ]
+  },
+  "report": "reports/replay/anomaly_2024-11-15.md"
+}

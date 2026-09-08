@@ -1,0 +1,249 @@
+{
+  "run_id": "anomaly_fleet_2024-08-23_r1",
+  "task": "anomaly",
+  "target": "fleet",
+  "as_of": "2024-08-23T00:00:00",
+  "window": {
+    "start": "2024-08-16T00:00:00",
+    "end": "2024-08-23T00:00:00",
+    "days": 7
+  },
+  "seed": 42,
+  "config": {
+    "baseline_days": 30,
+    "min_periods_hours": 480,
+    "z_threshold": 3.0,
+    "min_run_hours": 6,
+    "window_days": 7,
+    "target_assets": [
+      "GT1",
+      "BFP1",
+      "BFP2",
+      "CTF1"
+    ]
+  },
+  "input": {
+    "parquet": "data/derived/anomaly_fleet_2024-08-23.parquet",
+    "sidecar": "data/derived/anomaly_fleet_2024-08-23.meta.json",
+    "dead_tags": [
+      "GT1.BRG_TEMP_2"
+    ],
+    "outage_windows": [
+      {
+        "asset": "BFP1",
+        "from": "2024-07-19T00:00:00",
+        "to": "2024-07-21T23:00:00"
+      }
+    ]
+  },
+  "flags": [],
+  "per_asset": {},
+  "per_tag_stats": [
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 529,
+      "n_nan_values": 72,
+      "max_abs_z": 2.817328662157086,
+      "max_abs_z_in_window": 2.4999895600060142
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 529,
+      "n_nan_values": 72,
+      "max_abs_z": 2.478462349186188,
+      "max_abs_z_in_window": 2.004015619707106
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.FLOW",
+      "n_points": 1081,
+      "n_scored": 529,
+      "n_nan_values": 72,
+      "max_abs_z": 2.1328955446290427,
+      "max_abs_z_in_window": 1.8184579166247155
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 529,
+      "n_nan_values": 72,
+      "max_abs_z": 1.9751227474329727,
+      "max_abs_z_in_window": 1.9497906414084958
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 529,
+      "n_nan_values": 72,
+      "max_abs_z": 2.9576839173162703,
+      "max_abs_z_in_window": 2.442537699509287
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 529,
+      "n_nan_values": 72,
+      "max_abs_z": 3.0882907617398216,
+      "max_abs_z_in_window": 2.943901190514035
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.6399987543796892,
+      "max_abs_z_in_window": 2.502327034876911
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.6152346883542346,
+      "max_abs_z_in_window": 2.055803943298174
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2054460512383334,
+      "max_abs_z_in_window": 1.9120489586848615
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2038943806862425,
+      "max_abs_z_in_window": 1.9201247079730996
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.3469774039349898,
+      "max_abs_z_in_window": 2.471014183310348
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.931212772225875,
+      "max_abs_z_in_window": 2.931212772225875
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.026451058546484,
+      "max_abs_z_in_window": 3.026451058546484
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.4164092980686824,
+      "max_abs_z_in_window": 2.1075498714694634
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.SPEED",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.996791632514816,
+      "max_abs_z_in_window": 2.996791632514816
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.445633102679326,
+      "max_abs_z_in_window": 4.445633102679326
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.BRG_TEMP_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.177318489893181,
+      "max_abs_z_in_window": 3.0669826872046815
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.CDP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2946522642451397,
+      "max_abs_z_in_window": 1.8774835993592636
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.EXH_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.384719383910132,
+      "max_abs_z_in_window": 2.0328461351392955
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.FUEL_FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.1700085418705832,
+      "max_abs_z_in_window": 1.841529596648782
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.LOAD_MW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.1524906280271865,
+      "max_abs_z_in_window": 1.8559416489448355
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.VIB_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.50212355396326,
+      "max_abs_z_in_window": 2.235940695791124
+    }
+  ],
+  "metrics": {
+    "n_flags": 0,
+    "n_assets_flagged": 0,
+    "n_tags_flagged": 0,
+    "n_tags_scored": 22,
+    "assets_flagged": []
+  },
+  "report": "reports/replay/anomaly_2024-08-23.md"
+}

@@ -1,0 +1,760 @@
+[
+  {
+    "day": 200,
+    "as_of": "2024-07-19T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-07-19_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "GT1",
+      "p_fail": 0.003,
+      "interpretation": "below threshold; weak signal consistent with compressor_fouling (EXH_TEMP)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "GT1": 0.003,
+      "BFP1": 0.001,
+      "CTF1": 0.001,
+      "BFP2": 0.001
+    }
+  },
+  {
+    "day": 207,
+    "as_of": "2024-07-26T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-07-26_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP1",
+      "p_fail": 0.005,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_NDE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP1": 0.005,
+      "GT1": 0.003,
+      "CTF1": 0.001,
+      "BFP2": 0.0
+    }
+  },
+  {
+    "day": 214,
+    "as_of": "2024-08-02T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-08-02_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.026,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_DE, BRG_TEMP_DE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP2": 0.026,
+      "GT1": 0.002,
+      "CTF1": 0.001,
+      "BFP1": 0.0
+    }
+  },
+  {
+    "day": 221,
+    "as_of": "2024-08-09T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-08-09_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.005,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_NDE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP2": 0.005,
+      "GT1": 0.004,
+      "CTF1": 0.001,
+      "BFP1": 0.001
+    }
+  },
+  {
+    "day": 228,
+    "as_of": "2024-08-16T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-08-16_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.06,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_DE, VIB_NDE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP2": 0.06,
+      "BFP1": 0.015,
+      "GT1": 0.004,
+      "CTF1": 0.001
+    }
+  },
+  {
+    "day": 235,
+    "as_of": "2024-08-23T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-08-23_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.112,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_DE, VIB_NDE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP2": 0.112,
+      "BFP1": 0.009,
+      "GT1": 0.005,
+      "CTF1": 0.001
+    }
+  },
+  {
+    "day": 242,
+    "as_of": "2024-08-30T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-08-30_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.891,
+      "interpretation": "consistent with bearing_wear (VIB_DE, VIB_NDE)"
+    },
+    "predict_alerts": [
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP2": 0.891,
+      "BFP1": 0.045,
+      "GT1": 0.007,
+      "CTF1": 0.002
+    }
+  },
+  {
+    "day": 249,
+    "as_of": "2024-09-06T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-09-06_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.742,
+      "interpretation": "consistent with bearing_wear (VIB_DE, BRG_TEMP_DE)"
+    },
+    "predict_alerts": [
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP2": 0.742,
+      "BFP1": 0.077,
+      "GT1": 0.006,
+      "CTF1": 0.002
+    }
+  },
+  {
+    "day": 256,
+    "as_of": "2024-09-13T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-09-13_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 1.0,
+      "interpretation": "consistent with bearing_wear (VIB_DE, BRG_TEMP_DE)"
+    },
+    "predict_alerts": [
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP2": 1.0,
+      "BFP1": 0.091,
+      "GT1": 0.008,
+      "CTF1": 0.002
+    }
+  },
+  {
+    "day": 263,
+    "as_of": "2024-09-20T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-09-20_r1",
+    "anomaly_flags": [
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-16T11:00:00",
+        "severity": 3.94,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-17T10:00:00",
+        "severity": 4.23,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-18T13:00:00",
+        "severity": 3.44,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-19T16:00:00",
+        "severity": 3.71,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-16T12:00:00",
+        "severity": 5.09,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-17T13:00:00",
+        "severity": 4.63,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-18T12:00:00",
+        "severity": 4.22,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-19T10:00:00",
+        "severity": 4.17,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      }
+    ],
+    "anomaly_assets": [
+      "BFP2"
+    ],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 1.0,
+      "interpretation": "consistent with bearing_wear (VIB_DE, BRG_TEMP_DE)"
+    },
+    "predict_alerts": [
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP2": 1.0,
+      "BFP1": 0.087,
+      "GT1": 0.013,
+      "CTF1": 0.004
+    }
+  },
+  {
+    "day": 270,
+    "as_of": "2024-09-27T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-09-27_r1",
+    "anomaly_flags": [
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-20T11:00:00",
+        "severity": 3.88,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-21T15:00:00",
+        "severity": 3.49,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-23T09:00:00",
+        "severity": 3.6,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-24T11:00:00",
+        "severity": 3.51,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.BRG_TEMP_DE",
+        "first_flag_ts": "2024-09-25T09:00:00",
+        "severity": 3.38,
+        "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-20T05:00:00",
+        "severity": 3.97,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-21T07:00:00",
+        "severity": 4.2,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      },
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-22T07:00:00",
+        "severity": 3.9,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      }
+    ],
+    "anomaly_assets": [
+      "BFP2"
+    ],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 1.0,
+      "interpretation": "consistent with bearing_wear (VIB_DE, BRG_TEMP_DE)"
+    },
+    "predict_alerts": [
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP2": 1.0,
+      "BFP1": 0.039,
+      "GT1": 0.015,
+      "CTF1": 0.005
+    }
+  },
+  {
+    "day": 277,
+    "as_of": "2024-10-04T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-10-04_r1",
+    "anomaly_flags": [
+      {
+        "asset": "BFP2",
+        "tag": "BFP2.VIB_DE",
+        "first_flag_ts": "2024-09-22T07:00:00",
+        "severity": 3.9,
+        "interpretation": "DE vibration rising: primary bearing_wear symptom"
+      }
+    ],
+    "anomaly_assets": [
+      "BFP2"
+    ],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 1.0,
+      "interpretation": "consistent with bearing_wear (VIB_DE, VIB_NDE, BRG_TEMP_DE)"
+    },
+    "predict_alerts": [
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP2": 1.0,
+      "GT1": 0.021,
+      "CTF1": 0.005,
+      "BFP1": 0.004
+    }
+  },
+  {
+    "day": 284,
+    "as_of": "2024-10-11T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-10-11_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "GT1",
+      "p_fail": 0.029,
+      "interpretation": "below threshold; weak signal consistent with compressor_fouling (LOAD_MW, CDP)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "GT1": 0.029,
+      "CTF1": 0.006,
+      "BFP1": 0.001,
+      "BFP2": 0.0
+    }
+  },
+  {
+    "day": 291,
+    "as_of": "2024-10-18T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-10-18_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "GT1",
+      "p_fail": 0.032,
+      "interpretation": "below threshold; weak signal consistent with compressor_fouling (CDP, LOAD_MW)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "GT1": 0.032,
+      "BFP1": 0.01,
+      "CTF1": 0.008,
+      "BFP2": 0.0
+    }
+  },
+  {
+    "day": 298,
+    "as_of": "2024-10-25T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-10-25_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP1",
+      "p_fail": 0.216,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_NDE, VIB_DE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP1": 0.216,
+      "GT1": 0.045,
+      "CTF1": 0.011,
+      "BFP2": 0.0
+    }
+  },
+  {
+    "day": 305,
+    "as_of": "2024-11-01T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-11-01_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP1",
+      "p_fail": 0.368,
+      "interpretation": "consistent with bearing_wear (VIB_DE, VIB_NDE)"
+    },
+    "predict_alerts": [
+      "BFP1"
+    ],
+    "predict_all": {
+      "BFP1": 0.368,
+      "BFP2": 0.064,
+      "GT1": 0.033,
+      "CTF1": 0.01
+    }
+  },
+  {
+    "day": 312,
+    "as_of": "2024-11-08T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-11-08_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP1",
+      "p_fail": 0.246,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_DE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP1": 0.246,
+      "BFP2": 0.236,
+      "GT1": 0.051,
+      "CTF1": 0.014
+    }
+  },
+  {
+    "day": 319,
+    "as_of": "2024-11-15T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-11-15_r1",
+    "anomaly_flags": [
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-11T13:00:00",
+        "severity": 3.84,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-12T14:00:00",
+        "severity": 4.04,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-13T16:00:00",
+        "severity": 3.86,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-14T14:00:00",
+        "severity": 4.12,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      }
+    ],
+    "anomaly_assets": [
+      "CTF1"
+    ],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.821,
+      "interpretation": "consistent with bearing_wear (VIB_DE)"
+    },
+    "predict_alerts": [
+      "BFP2",
+      "BFP1"
+    ],
+    "predict_all": {
+      "BFP2": 0.821,
+      "BFP1": 0.62,
+      "GT1": 0.041,
+      "CTF1": 0.011
+    }
+  },
+  {
+    "day": 326,
+    "as_of": "2024-11-22T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-11-22_r1",
+    "anomaly_flags": [
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-15T12:00:00",
+        "severity": 3.99,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-17T12:00:00",
+        "severity": 3.52,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-18T11:00:00",
+        "severity": 3.88,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-19T10:00:00",
+        "severity": 3.62,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.GBX_OIL_TEMP",
+        "first_flag_ts": "2024-11-20T08:00:00",
+        "severity": 3.43,
+        "interpretation": "gearbox oil temperature rising: leading gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.VIB",
+        "first_flag_ts": "2024-11-15T00:00:00",
+        "severity": 4.68,
+        "interpretation": "fan vibration rising: late gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.VIB",
+        "first_flag_ts": "2024-11-15T09:00:00",
+        "severity": 4.11,
+        "interpretation": "fan vibration rising: late gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.VIB",
+        "first_flag_ts": "2024-11-16T13:00:00",
+        "severity": 4.65,
+        "interpretation": "fan vibration rising: late gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.VIB",
+        "first_flag_ts": "2024-11-17T07:00:00",
+        "severity": 4.32,
+        "interpretation": "fan vibration rising: late gearbox_wear symptom"
+      },
+      {
+        "asset": "CTF1",
+        "tag": "CTF1.VIB",
+        "first_flag_ts": "2024-11-17T21:00:00",
+        "severity": 4.24,
+        "interpretation": "fan vibration rising: late gearbox_wear symptom"
+      }
+    ],
+    "anomaly_assets": [
+      "CTF1"
+    ],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP1",
+      "p_fail": 0.384,
+      "interpretation": "consistent with bearing_wear (VIB_DE, VIB_NDE)"
+    },
+    "predict_alerts": [
+      "BFP1",
+      "BFP2"
+    ],
+    "predict_all": {
+      "BFP1": 0.384,
+      "BFP2": 0.34,
+      "GT1": 0.041,
+      "CTF1": 0.009
+    }
+  },
+  {
+    "day": 333,
+    "as_of": "2024-11-29T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-11-29_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP1",
+      "p_fail": 0.159,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (BRG_TEMP_DE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP1": 0.159,
+      "BFP2": 0.135,
+      "GT1": 0.085,
+      "CTF1": 0.008
+    }
+  },
+  {
+    "day": 340,
+    "as_of": "2024-12-06T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-12-06_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "GT1",
+      "p_fail": 0.201,
+      "interpretation": "below threshold; weak signal consistent with compressor_fouling (EXH_TEMP)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "GT1": 0.201,
+      "CTF1": 0.108,
+      "BFP2": 0.083,
+      "BFP1": 0.041
+    }
+  },
+  {
+    "day": 347,
+    "as_of": "2024-12-13T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-12-13_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "CTF1",
+      "p_fail": 0.381,
+      "interpretation": "consistent with gearbox_wear (GBX_OIL_TEMP, VIB)"
+    },
+    "predict_alerts": [
+      "CTF1"
+    ],
+    "predict_all": {
+      "CTF1": 0.381,
+      "BFP2": 0.251,
+      "GT1": 0.212,
+      "BFP1": 0.027
+    }
+  },
+  {
+    "day": 354,
+    "as_of": "2024-12-20T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-12-20_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "BFP2",
+      "p_fail": 0.197,
+      "interpretation": "below threshold; weak signal consistent with bearing_wear (VIB_NDE)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "BFP2": 0.197,
+      "GT1": 0.122,
+      "BFP1": 0.12,
+      "CTF1": 0.074
+    }
+  },
+  {
+    "day": 361,
+    "as_of": "2024-12-27T00:00:00",
+    "clock": "jumped",
+    "anomaly_run_id": "anomaly_fleet_2024-12-27_r1",
+    "anomaly_flags": [],
+    "anomaly_assets": [],
+    "predict_run_id": "predict_fleet_h30_2024-10-15_s42",
+    "predict_top": {
+      "asset": "GT1",
+      "p_fail": 0.24,
+      "interpretation": "below threshold; weak signal consistent with compressor_fouling (LOAD_MW)"
+    },
+    "predict_alerts": [],
+    "predict_all": {
+      "GT1": 0.24,
+      "BFP1": 0.145,
+      "CTF1": 0.048,
+      "BFP2": 0.028
+    }
+  }
+]

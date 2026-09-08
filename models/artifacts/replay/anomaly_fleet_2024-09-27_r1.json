@@ -1,0 +1,351 @@
+{
+  "run_id": "anomaly_fleet_2024-09-27_r1",
+  "task": "anomaly",
+  "target": "fleet",
+  "as_of": "2024-09-27T00:00:00",
+  "window": {
+    "start": "2024-09-20T00:00:00",
+    "end": "2024-09-27T00:00:00",
+    "days": 7
+  },
+  "seed": 42,
+  "config": {
+    "baseline_days": 30,
+    "min_periods_hours": 480,
+    "z_threshold": 3.0,
+    "min_run_hours": 6,
+    "window_days": 7,
+    "target_assets": [
+      "GT1",
+      "BFP1",
+      "BFP2",
+      "CTF1"
+    ]
+  },
+  "input": {
+    "parquet": "data/derived/anomaly_fleet_2024-09-27.parquet",
+    "sidecar": "data/derived/anomaly_fleet_2024-09-27.meta.json",
+    "dead_tags": [
+      "GT1.BRG_TEMP_2"
+    ],
+    "outage_windows": []
+  },
+  "flags": [
+    {
+      "first_flag_ts": "2024-09-20T11:00:00",
+      "last_flag_ts": "2024-09-20T23:00:00",
+      "hours_flagged": 13,
+      "severity": 3.877266293959802,
+      "z_peak_signed": 3.877266293959802,
+      "z_at_end": 3.0641609406134953,
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-21T15:00:00",
+      "last_flag_ts": "2024-09-21T22:00:00",
+      "hours_flagged": 8,
+      "severity": 3.4878789499227687,
+      "z_peak_signed": 3.4878789499227687,
+      "z_at_end": 3.010635168506886,
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-23T09:00:00",
+      "last_flag_ts": "2024-09-23T21:00:00",
+      "hours_flagged": 13,
+      "severity": 3.6025483859007426,
+      "z_peak_signed": 3.6025483859007426,
+      "z_at_end": 3.004739685453678,
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-24T11:00:00",
+      "last_flag_ts": "2024-09-24T21:00:00",
+      "hours_flagged": 11,
+      "severity": 3.5087768081116586,
+      "z_peak_signed": 3.5087768081116586,
+      "z_at_end": 3.160486762221129,
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-25T09:00:00",
+      "last_flag_ts": "2024-09-25T22:00:00",
+      "hours_flagged": 14,
+      "severity": 3.377400135632519,
+      "z_peak_signed": 3.377400135632519,
+      "z_at_end": 3.0427288738045095,
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "interpretation": "DE bearing temperature rising: bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-20T05:00:00",
+      "last_flag_ts": "2024-09-21T05:00:00",
+      "hours_flagged": 25,
+      "severity": 3.973411633220161,
+      "z_peak_signed": 3.973411633220161,
+      "z_at_end": 3.5633634097755835,
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "interpretation": "DE vibration rising: primary bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-21T07:00:00",
+      "last_flag_ts": "2024-09-22T05:00:00",
+      "hours_flagged": 23,
+      "severity": 4.201303076179913,
+      "z_peak_signed": 4.201303076179913,
+      "z_at_end": 3.1281779426873206,
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "interpretation": "DE vibration rising: primary bearing_wear symptom"
+    },
+    {
+      "first_flag_ts": "2024-09-22T07:00:00",
+      "last_flag_ts": "2024-09-27T00:00:00",
+      "hours_flagged": 114,
+      "severity": 3.897120386301541,
+      "z_peak_signed": 3.897120386301541,
+      "z_at_end": 3.2917566433749395,
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "interpretation": "DE vibration rising: primary bearing_wear symptom"
+    }
+  ],
+  "per_asset": {
+    "BFP2": {
+      "n_flags": 8,
+      "max_severity": 4.201303076179913,
+      "most_consistent_mode": "bearing_wear",
+      "supporting_tags": [
+        "BRG_TEMP_DE",
+        "VIB_DE"
+      ],
+      "expected_symptom_tags": [
+        "VIB_DE",
+        "BRG_TEMP_DE",
+        "VIB_NDE",
+        "MOTOR_CURR"
+      ],
+      "unexplained_tags": []
+    }
+  },
+  "per_tag_stats": [
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.4896793734511635,
+      "max_abs_z_in_window": 2.4896793734511635
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.5173696123587628,
+      "max_abs_z_in_window": 2.452799440701422
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2003426670815704,
+      "max_abs_z_in_window": 1.9442370745589082
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.1621367515608227,
+      "max_abs_z_in_window": 1.8771602818140312
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.5793062598230128,
+      "max_abs_z_in_window": 2.4555946169771525
+    },
+    {
+      "asset": "BFP1",
+      "tag": "BFP1.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.0915143805780314,
+      "max_abs_z_in_window": 2.7145537645295406
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.BRG_TEMP_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.234672093525757,
+      "max_abs_z_in_window": 3.877266293959802
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.DISCH_PRESS",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.536707471614321,
+      "max_abs_z_in_window": 2.2166952031013802
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.123925638990132,
+      "max_abs_z_in_window": 1.9108713122688132
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.146571687609373,
+      "max_abs_z_in_window": 2.1368970391100275
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_DE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 5.088896551810246,
+      "max_abs_z_in_window": 4.201303076179913
+    },
+    {
+      "asset": "BFP2",
+      "tag": "BFP2.VIB_NDE",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 4.176763720593187,
+      "max_abs_z_in_window": 4.176763720593187
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.GBX_OIL_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.344447265990091,
+      "max_abs_z_in_window": 2.344447265990091
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.MOTOR_CURR",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.482513228450494,
+      "max_abs_z_in_window": 2.0192729050285747
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.SPEED",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.358046503015463,
+      "max_abs_z_in_window": 2.921108697110156
+    },
+    {
+      "asset": "CTF1",
+      "tag": "CTF1.VIB",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.134806130540782,
+      "max_abs_z_in_window": 2.7826234078166134
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.BRG_TEMP_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.913811164504847,
+      "max_abs_z_in_window": 2.536742670039142
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.CDP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2667448643235932,
+      "max_abs_z_in_window": 1.9195495532977969
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.EXH_TEMP",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.2176882885938665,
+      "max_abs_z_in_window": 2.191681920815439
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.FUEL_FLOW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.0803210792635167,
+      "max_abs_z_in_window": 1.9551366358510358
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.LOAD_MW",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 2.018737503363693,
+      "max_abs_z_in_window": 1.9685028516620164
+    },
+    {
+      "asset": "GT1",
+      "tag": "GT1.VIB_1",
+      "n_points": 1081,
+      "n_scored": 601,
+      "n_nan_values": 0,
+      "max_abs_z": 3.0705114434077925,
+      "max_abs_z_in_window": 2.7235999674258133
+    }
+  ],
+  "metrics": {
+    "n_flags": 8,
+    "n_assets_flagged": 1,
+    "n_tags_flagged": 2,
+    "n_tags_scored": 22,
+    "assets_flagged": [
+      "BFP2"
+    ]
+  },
+  "report": "reports/replay/anomaly_2024-09-27.md"
+}

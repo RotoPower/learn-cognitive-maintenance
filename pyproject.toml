@@ -12,12 +12,14 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.2",
     "pyarrow>=15",
+    "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     "uvicorn>=0.52.4",
 ]
 
 [project.scripts]
 plant-sim = "plant.sim:main"
+plantctl = "plant.cli:main"
 
 [build-system]
 requires = ["hatchling"]

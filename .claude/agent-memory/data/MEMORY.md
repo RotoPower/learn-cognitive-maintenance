@@ -1,0 +1,2 @@
+- [Dataset quirks & sim/API access](dataset_quirks_sim.md) — dead tag, outage/missing/dup windows, data/raw + plantctl access notes, Aug 2024 profile result
+- [prepare_anomaly_table.py script](prepare_anomaly_table_script.md) — builds fleet anomaly tables from data/sim/sensors.csv, handles the four quirks
