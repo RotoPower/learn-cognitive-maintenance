@@ -39,14 +39,6 @@ cwd = str(payload.get("cwd", ""))
 in_agent_worktree = re.search(r"[/\\]\.claude[/\\]worktrees[/\\]", cwd) is not None
 is_modeler = agent == "modeler" or (agent is None and in_agent_worktree)
 
-_dbg = os.path.join(os.environ.get("TEMP") or os.environ.get("TMPDIR") or "/tmp", "plant-hook-debug.jsonl")
-try:  # TEMP diagnostic: confirm what identifies the caller; remove once settled
-    with open(_dbg, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"agent_type": agent, "agent_id": payload.get("agent_id"), "cwd": cwd, "is_modeler": is_modeler,
-                             "cmd": str((payload.get("tool_input") or {}).get("command", ""))[:60]}) + "\n")
-except Exception:
-    pass
-
 if not is_modeler:
     sys.exit(0)
 cmd = str((payload.get("tool_input") or {}).get("command", ""))

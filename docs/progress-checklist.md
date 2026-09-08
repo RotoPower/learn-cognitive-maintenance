@@ -55,7 +55,7 @@ Legend: `[x]` done and verified · `[~]` partly done · `[ ]` not started · **?
 **Checkpoint C**
 - [x] anomaly flags BFP-2 with a sensible interpretation; validator says **GO** with measured lead time: first flag day 259 (2024-09-16), failure day 270, **11 days lead** (7 by weekly cadence); CTF1 also caught (10 days); GT1 slow fouling missed (known gap); 0.09 false alerts per asset-month
 - [x] predict produces a Colab artefact and the validator confirms the split is time-based (cutoff day 288, 30-day embargo) and ground truth never entered features. Verdict **NO-GO on quality**: 0 of 2 out-of-sample failures caught, 0.58 false alerts per asset-month, `hours_since_repair` acting as a clock proxy. Retrain with more failure examples before Part D scoring
-- [ ] `modeler` cannot query the plant API (no `plantctl`, no `curl` restriction tested; **?**)
+- [x] `modeler` cannot query the plant API. First attempt: it queried happily (a prompt line is not a control). Fixed with `scripts/block-plant-api.sh`, installed in the modeler's frontmatter and project-wide in `.claude/settings.json`, gated on the modeler (payload `agent_type`, or cwd under `.claude/worktrees/`). Verified live: `plantctl` blocked with the hook's message; `data` and `validator` unaffected (15-case battery)
 - [ ] the four "why" questions (personal; **?**)
 
 ## Part D — Cloudflare
@@ -92,6 +92,9 @@ Legend: `[x]` done and verified · `[~]` partly done · `[ ]` not started · **?
 3. **Tag names** in `docs/plant.md` are richer than the module's sketch; the maintenance-domain skill and all code use the richer set consistently, so this is fine, but the dashboard and playbook in Parts D/E should use these names.
 4. **`/run` name** shadows a built-in Claude Code skill. Consider `/pipeline`.
 5. **Default `faults.yaml` gives one failure per mode**, so `predict` trained on the scripted year sees only bearing wear before any sensible cutoff. Use `/admin/inject_fault` or a richer scenario file for training data (the test suite already does this).
+
+6. **Worktree agents see `origin/main`, not local HEAD.** The modeler's `isolation: worktree` checkout is created from the pushed branch. Uncommitted or unpushed files (scripts, hooks, `pyproject.toml` entry points) do not exist there. Push before asking the modeler to use anything new.
+7. **Hooks fail open when their interpreter is missing.** A worktree has no `.venv`; the original hook scripts fell back to `uv run`, which errored, and a hook that errors does not block. All three hooks now resolve Python from the main checkout's venv (via git's common dir) or the system Python, and exit 2 if none is found.
 
 ## Suggested order for what is left in Parts B–C
 
