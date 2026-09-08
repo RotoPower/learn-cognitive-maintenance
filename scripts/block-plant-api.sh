@@ -31,12 +31,24 @@ except Exception:
 if payload.get("tool_name") != "Bash":
     sys.exit(0)
 # Installed both in the modeler's frontmatter and project-wide in .claude/settings.json.
-# Project-wide, only act when the caller is the modeler subagent (hook payload carries agent_type).
+# Project-wide, act only for the modeler. Two signals: the payload's agent_type (when the
+# runtime provides it) and the cwd: only worktree-isolated agents run under
+# .claude/worktrees/, and the modeler is the only agent with `isolation: worktree`.
 agent = payload.get("agent_type")
-if agent is not None and agent != "modeler":
+cwd = str(payload.get("cwd", ""))
+in_agent_worktree = re.search(r"[/\\]\.claude[/\\]worktrees[/\\]", cwd) is not None
+is_modeler = agent == "modeler" or (agent is None and in_agent_worktree)
+
+_dbg = os.path.join(os.environ.get("TEMP") or os.environ.get("TMPDIR") or "/tmp", "plant-hook-debug.jsonl")
+try:  # TEMP diagnostic: confirm what identifies the caller; remove once settled
+    with open(_dbg, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"agent_type": agent, "agent_id": payload.get("agent_id"), "cwd": cwd, "is_modeler": is_modeler,
+                             "cmd": str((payload.get("tool_input") or {}).get("command", ""))[:60]}) + "\n")
+except Exception:
+    pass
+
+if not is_modeler:
     sys.exit(0)
-if agent is None and os.environ.get("BLOCK_PLANT_API_SCOPE", "modeler") == "modeler":
-    sys.exit(0)  # main session (no agent_type): not the modeler, allow
 cmd = str((payload.get("tool_input") or {}).get("command", ""))
 
 API_CLIENTS = re.compile(
