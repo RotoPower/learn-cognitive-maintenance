@@ -304,7 +304,11 @@ def upload(art: dict | str | Path, base_url: str, admin_token: str, _post=None) 
     req = urllib.request.Request(
         url,
         data=json.dumps(body, default=str).encode(),
-        headers={"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {admin_token}",
+            "Content-Type": "application/json",
+            "User-Agent": "plant-models/0.1 (+https://github.com/RotoPower/learn-cognitive-maintenance)",  # Cloudflare blocks Python-urllib
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=60) as r:

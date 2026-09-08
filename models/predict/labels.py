@@ -40,7 +40,10 @@ def load_failures(ground_truth: str | Path | dict | None = None, api_url: str | 
         token = os.environ.get("PLANT_ADMIN_TOKEN")
         if not token:
             raise RuntimeError("PLANT_ADMIN_TOKEN is not set")
-        req = urllib.request.Request(api_url.rstrip("/") + "/admin/ground_truth", headers={"Authorization": f"Bearer {token}"})
+        req = urllib.request.Request(
+            api_url.rstrip("/") + "/admin/ground_truth",
+            headers={"Authorization": f"Bearer {token}", "User-Agent": "plant-models/0.1 (+https://github.com/RotoPower/learn-cognitive-maintenance)"},
+        )
         with urllib.request.urlopen(req, timeout=30) as r:
             gt = json.loads(r.read().decode())
     else:

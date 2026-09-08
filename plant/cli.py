@@ -60,8 +60,12 @@ class ApiError(Exception):
         self.status, self.detail = status, detail
 
 
+USER_AGENT = "plantctl/0.1 (+https://github.com/RotoPower/learn-cognitive-maintenance)"
+
+
 def _urllib_transport(method: str, url: str, body: dict | None, token: str | None) -> tuple[int, Any]:
-    headers = {"Accept": "application/json"}
+    # Cloudflare's Browser Integrity Check rejects Python's default "Python-urllib/x" agent.
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     data = None
@@ -155,13 +159,19 @@ def cmd_artifacts(c: Client, a) -> Any:
 
 def cmd_upload_artifact(c: Client, a) -> Any:
     art = json.loads(Path(a.file).read_text(encoding="utf-8"))
-    body = art if {"run_id", "seed"} <= set(art) and "model" in art else {
-        "run_id": art["run_id"],
-        "seed": art.get("seed", 0),
-        "model": {k: art[k] for k in ("feature_names", "scaler", "coefficients", "intercept", "threshold", "config") if k in art},
-        "metrics": art.get("metrics", {}),
-        "meta": {k: art[k] for k in ("task", "target", "horizon_days", "cutoff", "split", "created_at", "as_of") if k in art},
-    }
+    if {"run_id", "seed"} <= set(art) and "model" in art:
+        body = art  # already in API shape
+    else:
+        model_keys = ("feature_names", "scaler", "coefficients", "intercept", "threshold", "config")
+        model = {k: art[k] for k in model_keys if k in art}
+        body = {
+            "run_id": art["run_id"],
+            "seed": art.get("seed", 0),
+            # predict artefacts: the fitted model; anything else (e.g. anomaly runs): the whole artefact
+            "model": model if "coefficients" in model else art,
+            "metrics": art.get("metrics", {}),
+            "meta": {k: art[k] for k in ("task", "target", "horizon_days", "cutoff", "split", "created_at", "as_of") if k in art},
+        }
     return c.call("POST", "/admin/model_artifacts", body=body)
 
 

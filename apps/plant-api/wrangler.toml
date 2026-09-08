@@ -42,7 +42,7 @@ new_sqlite_classes = ["Clock"]
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "plant-staging"
-database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-staging"
+database_id = "f639c0e5-a838-4d97-8b87-3f4328d1758f"
 migrations_dir = "migrations"
 
 # ------------------------------------------------------------- production
