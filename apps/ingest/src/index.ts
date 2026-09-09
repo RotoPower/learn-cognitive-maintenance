@@ -18,12 +18,23 @@
 export interface Env {
   DB: D1Database;
   PLANT_API_URL: string;
+  /** Service Binding to the plant API Worker (staging/production). Worker-to-Worker
+   *  calls over a public workers.dev URL fail with Cloudflare error 1042, so when the
+   *  binding is present it is used instead of the network. Absent in local dev/tests. */
+  PLANT?: { fetch(input: string | Request, init?: RequestInit): Promise<Response> };
   READ_TOKEN?: string;
   ADMIN_TOKEN?: string;
   MAX_BACKFILL_HOURS?: string;
 }
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
+
+/** Pick the transport: injected fetcher (tests) > service binding > global fetch. */
+function transport(env: Env, injected?: Fetcher): Fetcher {
+  if (injected) return injected;
+  if (env.PLANT) return (url, init) => env.PLANT!.fetch(url, init);
+  return (url, init) => fetch(url, init);
+}
 
 const UA = "plant-ingest/0.1 (+https://github.com/RotoPower/learn-cognitive-maintenance)";
 const HOUR_MS = 3_600_000;
@@ -69,7 +80,8 @@ async function upsert(env: Env, rows: { tag: string; ts: string; value: number |
 }
 
 /** One ingest pass. `fetcher` is injectable for tests. */
-export async function ingestOnce(env: Env, fetcher: Fetcher = fetch): Promise<IngestResult> {
+export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestResult> {
+  const fetcher = transport(env, injected);
   const latest = await api<Latest>(env, fetcher, "/tags/latest");
   const simHour = latest.timestamp;
   const tags = Object.keys(latest.values);

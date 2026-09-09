@@ -23,7 +23,10 @@ npm run dev              # then: curl "http://127.0.0.1:8787/__scheduled?cron=*+
 ## Staging
 
 The D1 database is the one created for `apps/plant-api` (same `database_id`); its
-schema is migrated from there. Only the tokens are new:
+schema is migrated from there. Calls to the plant API go through a **Service Binding**
+(`PLANT` -> `plant-api-staging`), not the public URL: a Worker fetching another Worker's
+`workers.dev` address on the same account fails with Cloudflare error 1042. Locally
+(no binding) the Worker falls back to `PLANT_API_URL`. Only the tokens are new:
 
 ```bash
 wrangler secret put READ_TOKEN --env staging     # same value as the plant API's READ_TOKEN

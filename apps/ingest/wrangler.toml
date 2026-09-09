@@ -33,6 +33,12 @@ binding = "DB"
 database_name = "plant-staging"
 database_id = "f639c0e5-a838-4d97-8b87-3f4328d1758f"
 
+# Worker-to-Worker calls must use a Service Binding: fetching another Worker's
+# workers.dev URL from inside a Worker on the same account fails with error 1042.
+[[env.staging.services]]
+binding = "PLANT"
+service = "plant-api-staging"
+
 # ------------------------------------------------------------- production
 [env.production]
 name = "plant-ingest"
@@ -45,3 +51,7 @@ crons = ["* * * * *"]
 binding = "DB"
 database_name = "plant-production"
 database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-production"
+
+[[env.production.services]]
+binding = "PLANT"
+service = "plant-api"
