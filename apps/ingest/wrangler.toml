@@ -11,6 +11,7 @@ crons = ["* * * * *"]
 [vars]
 PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
 MAX_BACKFILL_HOURS = "168"
+INITIAL_BACKFILL_HOURS = "168"
 
 # Secrets: READ_TOKEN (plant API read token) and ADMIN_TOKEN (for POST /ingest manual trigger)
 # -> `wrangler secret put READ_TOKEN --env staging`; locally in .dev.vars
@@ -23,7 +24,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 # ---------------------------------------------------------------- staging
 [env.staging]
 name = "plant-ingest-staging"
-vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168" }
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168", INITIAL_BACKFILL_HOURS = "168" }
 
 [env.staging.triggers]
 crons = ["* * * * *"]
@@ -42,7 +43,7 @@ service = "plant-api-staging"
 # ------------------------------------------------------------- production
 [env.production]
 name = "plant-ingest"
-vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168" }
+vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168", INITIAL_BACKFILL_HOURS = "168" }
 
 [env.production.triggers]
 crons = ["* * * * *"]

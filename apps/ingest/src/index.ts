@@ -25,6 +25,8 @@ export interface Env {
   READ_TOKEN?: string;
   ADMIN_TOKEN?: string;
   MAX_BACKFILL_HOURS?: string;
+  /** Hours of history to seed when the readings table is empty (default 168). */
+  INITIAL_BACKFILL_HOURS?: string;
 }
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
@@ -91,12 +93,14 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
     tags.map((tag) => ({ tag, ts: simHour, value: latest.values[tag] })),
   );
 
-  // Backfill: hours strictly between the previously newest row and this hour.
+  // Backfill: hours strictly between the previously newest row and this hour. On the
+  // very first run (empty table) seed the trailing INITIAL_BACKFILL_HOURS so dashboards
+  // have a trend from day one.
   let backfilledHours = 0, backfilledRows = 0, skipped = 0;
   const prev = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings WHERE ts < ?").bind(simHour).first<{ ts: string | null }>();
-  if (prev?.ts) {
-    const maxHours = Number(env.MAX_BACKFILL_HOURS ?? 168);
-    const gapHours = Math.round((ms(simHour) - ms(prev.ts)) / HOUR_MS) - 1;
+  const maxHours = Number(env.MAX_BACKFILL_HOURS ?? 168);
+  const gapHours = prev?.ts ? Math.round((ms(simHour) - ms(prev.ts)) / HOUR_MS) - 1 : Number(env.INITIAL_BACKFILL_HOURS ?? 168);
+  {
     if (gapHours > 0) {
       const hours = Math.min(gapHours, maxHours);
       skipped = gapHours - hours;

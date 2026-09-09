@@ -92,6 +92,20 @@ describe("ingestOnce", () => {
     expect(r2.skipped_backfill_hours).toBe(44);
   });
 
+  it("seeds trailing history on the very first run when INITIAL_BACKFILL_HOURS is set", async () => {
+    const seeded = { ...testEnv(), INITIAL_BACKFILL_HOURS: "5" } as Env;
+    const { fetcher, calls } = fakeApi("2024-09-01T10:00:00");
+    const r = await ingestOnce(seeded, fetcher);
+    expect(r.backfilled_hours).toBe(5);
+    expect(r.total_rows).toBe(6 * TAGS.length); // 05..09 seeded + 10 current
+    expect(calls.filter((c) => c.includes("/history")).length).toBe(TAGS.length);
+    // second run: no gap, no more history calls
+    const again = fakeApi("2024-09-01T11:00:00");
+    const r2 = await ingestOnce(seeded, again.fetcher);
+    expect(r2.backfilled_hours).toBe(0);
+    expect(again.calls.length).toBe(1);
+  });
+
   it("stores outage readings as NULL", async () => {
     await ingestOnce(testEnv(), fakeApi("2024-07-20T03:00:00").fetcher);
     const row = await env.DB.prepare("SELECT value FROM readings WHERE tag='BFP1.FLOW'").first<{ value: number | null }>();

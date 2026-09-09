@@ -70,7 +70,10 @@ async function currentPlant(env: Env): Promise<{ plant: Plant; now: Date; speed:
   const clock = clockStub(env);
   const [script, { simMs, speed }] = await Promise.all([clock.script(), clock.now()]);
   const cfg: PlantConfig = { ...DEFAULT_FAULTS, seed: script.seed, scenarios: [...DEFAULT_FAULTS.scenarios, ...script.injected] };
-  return { plant: new Plant(cfg), now: new Date(simMs), speed };
+  const plant = new Plant(cfg);
+  // The clock never runs past the scripted horizon: readings beyond it are meaningless.
+  const now = new Date(Math.min(simMs, plant.end.getTime()));
+  return { plant, now, speed };
 }
 
 function parseInterval(text: string): number {
@@ -151,8 +154,8 @@ async function handle(req: Request, env: Env): Promise<Response> {
   // ----- clock -----
   if (path === "/clock" && method === "GET") {
     requireRead(req, env);
-    const { simMs, speed } = await clockStub(env).now();
-    return json({ sim_time: isoNaive(new Date(simMs)), speed });
+    const { now, speed, plant } = await currentPlant(env);
+    return json({ sim_time: isoNaive(now), speed, horizon_end: isoNaive(plant.end) });
   }
   if (path === "/clock/speed" && method === "POST") {
     requireAdmin(req, env);

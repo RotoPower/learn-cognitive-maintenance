@@ -10,7 +10,7 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.toml" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, READ_TOKEN: "r", ADMIN_TOKEN: "a", PLANT_API_URL: "http://plant", MAX_BACKFILL_HOURS: "168" },
+          bindings: { TEST_MIGRATIONS: migrations, READ_TOKEN: "r", ADMIN_TOKEN: "a", PLANT_API_URL: "http://plant", MAX_BACKFILL_HOURS: "168", INITIAL_BACKFILL_HOURS: "0" },
         },
       }),
     ],

@@ -35,9 +35,19 @@ describe("auth", () => {
 
 describe("clock", () => {
   it("reports sim time and speed, jumps, and refuses out-of-horizon jumps", async () => {
-    const c = (await (await get("/clock", READ)).json()) as { sim_time: string; speed: number };
+    const c = (await (await get("/clock", READ)).json()) as { sim_time: string; speed: number; horizon_end: string };
     expect(c.sim_time).toBe("2024-09-01T00:00:00");
     expect(c.speed).toBe(0);
+    expect(c.horizon_end).toBe("2024-12-31T00:00:00");
+    // the running clock is clamped to the horizon end: jump to the end, run fast, still at the end
+    await post("/clock/jump", { to: "2024-12-31T00:00:00" }, ADMIN);
+    await post("/clock/speed", { speed: 86_400 * 30 }, ADMIN);
+    await new Promise((r) => setTimeout(r, 50));
+    const end = (await (await get("/clock", READ)).json()) as { sim_time: string };
+    expect(end.sim_time).toBe("2024-12-31T00:00:00");
+    const latest = (await (await get("/tags/latest?asset_id=GT1", READ)).json()) as { timestamp: string };
+    expect(latest.timestamp).toBe("2024-12-31T00:00:00");
+    await post("/clock/speed", { speed: 0 }, ADMIN);
     const j = await post("/clock/jump", { to: "2024-10-01T00:00" }, ADMIN);
     expect(((await j.json()) as { sim_time: string }).sim_time).toBe("2024-10-01T00:00:00");
     expect((await post("/clock/jump", { to: "2030-01-01T00:00" }, ADMIN)).status).toBe(422);
