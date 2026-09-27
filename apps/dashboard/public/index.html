@@ -98,6 +98,26 @@
     <p class="result" id="demo-result" role="status" aria-live="polite"></p>
   </dialog>
 
+  <button class="btn chat-toggle" id="chat-toggle" type="button" aria-controls="chat" aria-expanded="false">Ask the plant</button>
+  <aside class="chat" id="chat" aria-labelledby="chat-title">
+    <div class="chat-head">
+      <h2 id="chat-title">Ask the plant</h2>
+      <button class="icon-btn" id="chat-close" type="button" aria-label="Close chat">×</button>
+    </div>
+    <div class="chat-log" id="chat-log" role="log" aria-live="polite">
+      <p class="muted">Answers come from the plant's live data and the operator playbook. Work orders are only drafts until you confirm them.</p>
+    </div>
+    <div class="chips" id="chat-chips">
+      <button type="button" class="chip">What happened to BFP-2 this week?</button>
+      <button type="button" class="chip">Which assets need attention?</button>
+      <button type="button" class="chip">What should we do about the gearbox alert?</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" maxlength="2000" autocomplete="off" placeholder="Ask about an asset…" aria-label="Message">
+      <button class="btn" type="submit">Send</button>
+    </form>
+  </aside>
+
   <div class="tooltip" id="tooltip" hidden></div>
   <script src="app.js" defer></script>
 </body>

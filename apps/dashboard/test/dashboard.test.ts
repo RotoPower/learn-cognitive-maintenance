@@ -140,3 +140,26 @@ describe("demo controls", () => {
     expect((await post("/api/demo/speed", { speed: 86400 })).status).toBe(404);
   });
 });
+
+describe("assistant proxy", () => {
+  it("streams the assistant's NDJSON through, adding the secret and viewer IP server-side", async () => {
+    const r = await post("/api/chat", { message: "What happened to BFP-2?", session_id: "sess-00000001" }, "203.0.113.50");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("ndjson");
+    const events = (await text(r)).trim().split("\n").map((l) => JSON.parse(l));
+    expect(events.map((e: { type: string }) => e.type)).toEqual(["tool", "text", "text", "done"]);
+    expect(events[1].text).toBe("ip 203.0.113.50: ");
+    const ok = await post("/api/chat/confirm", { session_id: "sess-00000001", draft_id: "d1" });
+    expect(JSON.parse(await text(ok))).toEqual({ id: "WO-00009", status: "open" });
+    expect((await post("/api/chat/confirm", { session_id: "sess-00000001", draft_id: "nope" })).status).toBe(404);
+  });
+
+  it("503 until the assistant is connected; a wrong secret is the operator's problem (502)", async () => {
+    const { assistant } = await import("../src/index");
+    const req = () => new Request("http://dash/api/chat", { method: "POST", body: JSON.stringify({ message: "hi", session_id: "sess-00000001" }) });
+    const none = { ...env, ASSISTANT: undefined, ASSISTANT_URL: undefined } as never;
+    await expect(assistant(none, req(), "/chat")).rejects.toMatchObject({ status: 503 });
+    const wrong = { ...env, ASSISTANT_SECRET: "nope" } as never;
+    await expect(assistant(wrong, req(), "/chat")).rejects.toMatchObject({ status: 502 });
+  });
+});

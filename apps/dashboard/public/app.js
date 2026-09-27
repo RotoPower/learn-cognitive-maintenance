@@ -325,3 +325,123 @@ document.addEventListener("DOMContentLoaded", () => {
   loadOverview();
   setInterval(loadOverview, 60_000);
 });
+
+// ---------------------------------------------------------------- chat (Part E assistant)
+
+const TOOL_LABEL = {
+  get_asset_status: "checked asset status", get_events: "read the event history",
+  get_recommendations: "read the playbook", create_workorder: "drafted a work order",
+};
+
+function sessionId() {
+  let id = null;
+  try { id = sessionStorage.getItem("plant-chat-session"); } catch { /* private mode */ }
+  if (!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) {
+    id = "web-" + Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+    try { sessionStorage.setItem("plant-chat-session", id); } catch { /* fine: one session per page load */ }
+  }
+  return id;
+}
+
+// Escape first, then a small safe subset of Markdown: paragraphs, bullets, **bold**, `code`.
+function renderMarkdown(src) {
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
+  const out = [];
+  let list = null;
+  for (const line of src.split("\n")) {
+    const m = /^\s*[-*]\s+(.*)$/.exec(line);
+    if (m) { (list ??= []).push(`<li>${inline(m[1])}</li>`); continue; }
+    if (list) { out.push(`<ul>${list.join("")}</ul>`); list = null; }
+    if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push(`<ul>${list.join("")}</ul>`);
+  return out.join("");
+}
+
+function addMsg(cls, html) {
+  const el = document.createElement("div");
+  el.className = `msg ${cls}`;
+  el.innerHTML = html;
+  $("#chat-log").appendChild(el);
+  $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
+  return el;
+}
+
+function draftCard(d) {
+  const card = document.createElement("div");
+  card.className = "draft-card";
+  card.innerHTML = `<div><strong>Draft work order</strong> · ${esc(d.asset_id)} · ${esc(d.work_type)}${d.scheduled_for ? ` · ${fmtTime(d.scheduled_for)}` : ""}</div>
+    <div>${esc(d.description)}</div>
+    <div class="row"><button class="btn" type="button">Confirm</button><button class="btn secondary" type="button">Cancel</button></div>`;
+  const [yes, no] = card.querySelectorAll("button");
+  no.onclick = () => { card.innerHTML = '<span class="muted">Draft discarded.</span>'; };
+  yes.onclick = async () => {
+    yes.disabled = no.disabled = true;
+    try {
+      const wo = await api("/api/chat/confirm", { method: "POST", body: JSON.stringify({ session_id: sessionId(), draft_id: d.draft_id }) });
+      card.innerHTML = `<span>Created <strong>${esc(wo.id)}</strong> on ${esc(d.asset_id)}.</span>`;
+      loadOverview();
+    } catch (e) {
+      card.insertAdjacentHTML("beforeend", `<p class="result error">${esc(e.message)}</p>`);
+      yes.disabled = no.disabled = false;
+    }
+  };
+  return card;
+}
+
+async function sendChat(message) {
+  const input = $("#chat-input"), send = $("#chat-form button");
+  addMsg("user", esc(message));
+  const bot = addMsg("bot", '<div class="tools"></div><div class="body"><span class="muted">Thinking…</span></div>');
+  const toolsEl = bot.querySelector(".tools"), body = bot.querySelector(".body");
+  input.disabled = send.disabled = true;
+  let text = "", tools = [];
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message, session_id: sessionId() }) });
+    if (!r.ok) {
+      const detail = (await r.json().catch(() => null))?.detail;
+      throw new Error(detail || `HTTP ${r.status}`);
+    }
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "text") { text += ev.text; body.innerHTML = renderMarkdown(text); }
+        else if (ev.type === "tool") { tools.push(TOOL_LABEL[ev.name] || ev.name); toolsEl.textContent = [...new Set(tools)].join(" · "); }
+        else if (ev.type === "draft") { bot.appendChild(draftCard(ev)); }
+        else if (ev.type === "error") { bot.classList.add("error"); body.innerHTML += `<p>${esc(ev.message)}</p>`; }
+        $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
+      }
+    }
+    if (!text && !bot.classList.contains("error")) body.innerHTML = '<span class="muted">No answer.</span>';
+  } catch (e) {
+    bot.classList.add("error");
+    body.innerHTML = `<p>${esc(e.message)}</p>`;
+  } finally {
+    input.disabled = send.disabled = false;
+    input.focus();
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const panel = $("#chat"), toggle = $("#chat-toggle");
+  const setOpen = (open) => { panel.classList.toggle("open", open); toggle.setAttribute("aria-expanded", String(open)); toggle.hidden = open; if (open) $("#chat-input").focus(); };
+  toggle.addEventListener("click", () => setOpen(true));
+  $("#chat-close").addEventListener("click", () => setOpen(false));
+  $("#chat-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const msg = $("#chat-input").value.trim();
+    if (!msg) return;
+    $("#chat-input").value = "";
+    sendChat(msg);
+  });
+  for (const chip of document.querySelectorAll(".chip")) chip.addEventListener("click", () => sendChat(chip.textContent));
+});

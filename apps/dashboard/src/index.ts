@@ -11,6 +11,8 @@
  *                               prediction, recommended actions, work orders
  *   POST /api/workorder         {asset_id, type, description, confirm: true} -> source='demo'
  *   POST /api/demo/:action      jump7 | jump {day} | score | inject {asset_id} | reset
+ *   POST /api/chat              {message, session_id} -> the assistant's NDJSON stream, passed through
+ *   POST /api/chat/confirm      {session_id, draft_id} -> the operator's Confirm of a drafted work order
  *
  * Abuse control instead of accounts: the API_LIMITER binding (60 requests/min per
  * viewer), and per-viewer / global hourly caps on demo actions and work orders kept in
@@ -33,6 +35,11 @@ export interface Env {
   READ_TOKEN?: string;
   ADMIN_TOKEN?: string;
   SCORING_ADMIN_TOKEN?: string;
+  /** Part E assistant behind a Cloudflare Tunnel; unset until the VM exists. ASSISTANT is a
+   *  test-only binding standing in for it. */
+  ASSISTANT_URL?: string;
+  ASSISTANT_SECRET?: string;
+  ASSISTANT?: { fetch(input: string | Request, init?: RequestInit): Promise<Response> };
   /** "on" once the predict model has a validator GO: risk then drives asset status. */
   PREDICT_TRUSTED?: string;
   CACHE_SECONDS?: string;
@@ -296,6 +303,40 @@ export async function createWorkorder(env: Env, req: Request) {
   return { id: woId, asset_id: b.asset_id, type, description, timestamp: ts, status: "open", source: "demo" };
 }
 
+// ------------------------------------------------------------------ assistant proxy (Part E)
+
+/** Forward to the assistant with the shared secret and the viewer's IP (for its per-viewer limit).
+ *  The browser never sees the secret or the assistant's address. */
+export async function assistant(env: Env, req: Request, path: "/chat" | "/workorders/confirm"): Promise<Response> {
+  if (!env.ASSISTANT && !env.ASSISTANT_URL) throw new HttpError(503, "the assistant is not connected yet (Part E); the rest of the dashboard works");
+  const body = await req.text();
+  if (body.length > 4000) throw new HttpError(413, "message too long");
+  const init: RequestInit = {
+    method: "POST",
+    body,
+    headers: {
+      "content-type": "application/json",
+      "x-demo-secret": env.ASSISTANT_SECRET ?? "",
+      "x-viewer-ip": req.headers.get("cf-connecting-ip") ?? "unknown",
+      "user-agent": UA,
+    },
+  };
+  const url = `${(env.ASSISTANT_URL ?? "http://assistant").replace(/\/+$/, "")}${path}`;
+  let r: Response;
+  try {
+    r = env.ASSISTANT ? await env.ASSISTANT.fetch(url, init) : await fetch(url, init);
+  } catch {
+    throw new HttpError(502, "the assistant is not reachable right now");
+  }
+  if (!r.ok) {
+    const detail = ((await r.json().catch(() => null)) as { detail?: string } | null)?.detail;
+    // 401 means the Worker's secret is wrong: an operator problem, not the viewer's
+    throw new HttpError(r.status === 401 ? 502 : r.status, r.status === 401 ? "the assistant rejected the dashboard (secret mismatch)" : detail ?? `assistant error ${r.status}`);
+  }
+  if (path === "/workorders/confirm") clearCache();
+  return new Response(r.body, { status: 200, headers: { "content-type": r.headers.get("content-type") ?? "application/json", "cache-control": "no-store" } });
+}
+
 export async function demo(env: Env, req: Request, action: string) {
   const viewer = await viewerId(req);
   const clock = await upstream<Clock>(env, "plant", "/clock");
@@ -360,6 +401,8 @@ export default {
       const a = /^\/api\/asset\/([A-Z0-9]+)$/.exec(p);
       if (a && req.method === "GET") return json(await assetDetail(env, a[1]));
       if (p === "/api/workorder" && req.method === "POST") return json(await createWorkorder(env, req));
+      if (p === "/api/chat" && req.method === "POST") return await assistant(env, req, "/chat");
+      if (p === "/api/chat/confirm" && req.method === "POST") return await assistant(env, req, "/workorders/confirm");
       const d = /^\/api\/demo\/([a-z0-9]+)$/.exec(p);
       if (d && req.method === "POST") return json(await demo(env, req, d[1]));
       throw new HttpError(404, "Not Found");

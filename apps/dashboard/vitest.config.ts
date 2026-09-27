@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 // Distinctive tokens so the tests can assert none of them ever reaches a response.
 const READ = "read-SECRET-token";
 const ADMIN = "admin-SECRET-token";
+const ASSISTANT_SECRET = "assistant-SECRET";
 
 /** Stateful fake of the plant API (clock, assets, log, history, admin) behind the PLANT binding. */
 function fakePlant() {
@@ -58,8 +59,17 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.toml" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, READ_TOKEN: READ, ADMIN_TOKEN: ADMIN, CACHE_SECONDS: "0" },
+          bindings: { TEST_MIGRATIONS: migrations, READ_TOKEN: READ, ADMIN_TOKEN: ADMIN, CACHE_SECONDS: "0", ASSISTANT_SECRET },
           serviceBindings: {
+            // Fake assistant: checks the shared secret and the forwarded viewer IP, streams NDJSON.
+            ASSISTANT: async (req: Request) => {
+              if (req.headers.get("x-demo-secret") !== ASSISTANT_SECRET) return Response.json({ detail: "missing or wrong X-Demo-Secret" }, { status: 401 });
+              const body = (await req.json()) as { message?: string; draft_id?: string };
+              if (new URL(req.url).pathname === "/workorders/confirm")
+                return body.draft_id === "d1" ? Response.json({ id: "WO-00009", status: "open" }) : Response.json({ detail: "no such draft" }, { status: 404 });
+              const lines = [{ type: "tool", name: "get_events" }, { type: "text", text: `ip ${req.headers.get("x-viewer-ip")}: ` }, { type: "text", text: `re ${body.message}` }, { type: "done" }];
+              return new Response(lines.map((l) => `${JSON.stringify(l)}\n`).join(""), { headers: { "content-type": "application/x-ndjson" } });
+            },
             PLANT: fakePlant(),
             SCORING: async (req: Request) =>
               req.headers.get("authorization") === `Bearer ${ADMIN}`
