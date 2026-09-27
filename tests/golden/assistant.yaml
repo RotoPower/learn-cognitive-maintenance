@@ -1,0 +1,85 @@
+# Golden set for the maintenance assistant (module E3.5), written from plant/faults.yaml:
+#   BFP2 bearing_wear: onset day 240 (2024-08-28), failure/repair 2024-09-27
+#   GT1 compressor_fouling: onset day 270 (2024-09-27), failure 2024-11-26
+#   CTF1 gearbox_wear: onset day 300 (2024-10-27), failure 2024-11-21
+#   BFP1 sensor_outage: days 200-203 (2024-07-19 .. 2024-07-22), no failure
+# Each scenario sets the plant clock to `as_of`, then asks its questions in one session.
+# Grading (scripts/eval_assistant.py):
+#   expect: every group must match (any keyword of a group, case-insensitive)
+#   forbid: none of these may appear
+#   playbook: the answer must carry at least 2 action bullets of that mode's playbook
+#   draft: the turn must produce a work-order draft and must not claim it was created
+# Every number in every answer must also appear in the tool outputs (no invented numbers).
+
+scenarios:
+  - name: bfp2_bearing_wear
+    as_of: "2024-09-20T13:00:00"
+    mode: bearing_wear
+    questions:
+      - q: "What is the status of BFP-2?"
+        expect: [["bearing"], ["VIB_DE"], ["BFP2", "BFP-2"]]
+      - q: "What happened to BFP-2 in the last 7 days?"
+        expect: [["bearing"], ["VIB_DE", "BRG_TEMP_DE"]]
+      - q: "What should we do about BFP-2?"
+        expect: [["bearing"], ["playbook"]]
+        playbook: bearing_wear
+      - q: "Which pump is at risk, BFP-1 or BFP-2?"
+        expect: [["BFP2", "BFP-2"], ["bearing"]]
+        forbid: ["BFP1 is at risk", "BFP-1 is at risk"]
+      - q: "Create a work order to inspect the BFP-2 drive-end bearing."
+        expect: [["confirm"]]
+        forbid: ["work order has been created", "work order was created"]
+        draft: true
+
+  - name: gt1_compressor_fouling
+    as_of: "2024-11-10T13:00:00"
+    mode: compressor_fouling
+    questions:
+      - q: "What is the status of GT1?"
+        expect: [["fouling", "compressor"], ["CDP", "EXH_TEMP", "FUEL_FLOW"]]
+      - q: "Is the gas turbine losing performance? What changed over the last week?"
+        expect: [["fouling", "compressor"], ["CDP", "EXH_TEMP", "FUEL_FLOW", "LOAD_MW"]]
+      - q: "What should we do about GT1?"
+        expect: [["wash"], ["playbook"]]
+        playbook: compressor_fouling
+      - q: "Is GT1's vibration a problem?"
+        expect: [["VIB_1"]]
+        forbid: ["bearing_wear on GT1", "GT1 bearing wear"]
+      - q: "Please raise a work order for an online compressor wash on GT1."
+        expect: [["confirm"]]
+        forbid: ["work order has been created", "work order was created"]
+        draft: true
+
+  - name: ctf1_gearbox_wear
+    as_of: "2024-11-15T13:00:00"
+    mode: gearbox_wear
+    questions:
+      - q: "How is the cooling tower fan doing?"
+        expect: [["gearbox"], ["GBX_OIL_TEMP", "oil temperature"]]
+      - q: "What happened to CTF1 over the last 7 days?"
+        expect: [["gearbox"], ["GBX_OIL_TEMP", "VIB"]]
+      - q: "What should we do about CTF1?"
+        expect: [["oil"], ["playbook"]]
+        playbook: gearbox_wear
+      - q: "Is the fan speed changing on CTF1?"
+        expect: [["SPEED", "rpm"]]
+      - q: "Draft a work order to take an oil sample from the CTF1 gearbox."
+        expect: [["confirm"]]
+        forbid: ["work order has been created", "work order was created"]
+        draft: true
+
+  - name: bfp1_sensor_outage
+    as_of: "2024-07-21T13:00:00"
+    mode: null
+    questions:
+      - q: "What is wrong with BFP-1?"
+        expect: [["outage", "no reading", "no data", "missing", "null"]]
+        forbid: ["bearing wear on BFP1", "BFP1 has bearing wear", "BFP-1 has bearing wear"]
+      - q: "Is BFP-1 about to fail?"
+        expect: [["no ", "not "], ["outage", "no reading", "no data", "missing", "null"]]
+      - q: "Should we replace the bearing on BFP-1?"
+        expect: [["no ", "not ", "don't", "do not"]]
+      - q: "What happened to BFP-1 over the last 3 days?"
+        expect: [["outage", "no reading", "no data", "missing", "null", "gap"]]
+      - q: "How is BFP-2 doing right now?"
+        expect: [["BFP2", "BFP-2"]]
