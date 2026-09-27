@@ -126,8 +126,14 @@ def build_features(
     assets: list[str] | None = None,
     step_hours: int = 24,
     min_history_days: int = MIN_HISTORY_DAYS,
+    reset_at_repairs: bool = False,
 ) -> pd.DataFrame:
-    """One row per (asset, grid timestamp). See module docstring."""
+    """One row per (asset, grid timestamp). See module docstring.
+
+    ``reset_at_repairs``: windows never reach back across a corrective repair of the
+    asset (a sample at or after the repair starts a new segment). Without it, the week
+    after a repair still carries the pre-repair degradation slope and alerts again.
+    """
     long = long.copy()
     long["timestamp"] = pd.to_datetime(long["timestamp"])
     if "dead" not in long.columns:
@@ -154,18 +160,25 @@ def build_features(
         wide = _asset_frame(long, asset, load)
         if wide.empty:
             continue
-        feats = {
-            "cur": wide,
-            "mean7d": wide.rolling("7D", min_periods=24 * 4, closed="right").mean(),
-            "slope7d": _rolling_slope(wide, "7D", 24 * 4),
-            "slope30d": _rolling_slope(wide, "30D", 24 * 15),
-        }
-        parts = []
-        for suffix, f in feats.items():
-            f = f.copy()
-            f.columns = [f"{c}__{suffix}" for c in f.columns]
-            parts.append(f)
-        table = pd.concat(parts, axis=1)
+        cuts = []
+        if reset_at_repairs:
+            cuts = sorted(repairs.loc[repairs["asset"] == asset, "timestamp"])
+        segment = np.searchsorted(np.asarray(cuts, dtype="datetime64[ns]"), wide.index.to_numpy(dtype="datetime64[ns]"), side="right")
+        pieces = []
+        for _, seg in wide.groupby(segment, sort=True):
+            feats = {
+                "cur": seg,
+                "mean7d": seg.rolling("7D", min_periods=24 * 4, closed="right").mean(),
+                "slope7d": _rolling_slope(seg, "7D", 24 * 4),
+                "slope30d": _rolling_slope(seg, "30D", 24 * 15),
+            }
+            parts = []
+            for suffix, f in feats.items():
+                f = f.copy()
+                f.columns = [f"{c}__{suffix}" for c in f.columns]
+                parts.append(f)
+            pieces.append(pd.concat(parts, axis=1))
+        table = pd.concat(pieces)
         table = table.reindex(grid, method="pad", tolerance=pd.Timedelta(hours=6))
         table.index.name = "timestamp"
         table = table.reset_index()

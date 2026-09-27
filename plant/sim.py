@@ -355,6 +355,16 @@ class Plant:
             for o in self.outages
         ]
 
+    def maintenance_log(self) -> list[dict[str, Any]]:
+        """The CMMS export: completed corrective repairs, as GET /maintenance/log shows them.
+        Operational data (operators know when they replaced a component), not ground truth:
+        no failure modes, onsets or health."""
+        return [
+            {"kind": "corrective_repair", "asset_id": f["asset"], "timestamp": f["repair"].isoformat(),
+             "description": "component replaced"}
+            for f in self.failures()
+        ]
+
     def ground_truth(self) -> dict[str, Any]:
         return {"seed": self.seed, "failures": self.failures(), "events": self.events()}
 
@@ -401,7 +411,7 @@ class Plant:
         return df.reset_index(drop=True)
 
     def write(self, out_dir: str | Path, freq_h: float = 1.0) -> dict[str, Path]:
-        """Write ``sensors.csv`` and validator-only ``ground_truth.json``."""
+        """Write ``sensors.csv``, ``maintenance_log.json`` (CMMS) and validator-only ``ground_truth.json``."""
         out = Path(out_dir)
         if "raw" in out.parts:
             raise PermissionError("data/raw/ is read-only (CLAUDE.md); write elsewhere")
@@ -410,7 +420,9 @@ class Plant:
         truth = out / "ground_truth.json"
         self.generate(freq_h).to_csv(sensors, index=False, date_format="%Y-%m-%dT%H:%M:%S")
         truth.write_text(json.dumps(self.ground_truth(), default=str, indent=2), encoding="utf-8")
-        return {"sensors": sensors, "ground_truth": truth}
+        log = out / "maintenance_log.json"
+        log.write_text(json.dumps(self.maintenance_log(), indent=2), encoding="utf-8")
+        return {"sensors": sensors, "maintenance_log": log, "ground_truth": truth}
 
 
 # --------------------------------------------------------------------------- #

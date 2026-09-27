@@ -41,6 +41,23 @@ SYMPTOMS: dict[str, tuple[str, int]] = {
 }
 
 
+# Documented symptom tags of the three failure modes (maintenance-domain skill), including
+# secondary ones. Non-symptom tags (e.g. CTF1 SPEED) only add chances for spurious
+# correlation with the few training failures.
+SYMPTOM_TAGS = ("VIB_DE", "BRG_TEMP_DE", "VIB_NDE", "MOTOR_CURR", "CDP", "EXH_TEMP", "FUEL_FLOW", "LOAD_MW", "GBX_OIL_TEMP", "VIB")
+FEATURE_SETS = ("all", "symptom_slope7d")
+
+
+def select_features(table: pd.DataFrame, feature_set: str = "all") -> list[str]:
+    """Model input columns for a named feature set."""
+    cols = feature_columns(table)
+    if feature_set == "all":
+        return cols
+    if feature_set == "symptom_slope7d":
+        return [c for c in cols if c.split("__")[0] in SYMPTOM_TAGS and c.endswith("__slope7d")]
+    raise ValueError(f"unknown feature set {feature_set!r}; choose from {FEATURE_SETS}")
+
+
 # --------------------------------------------------------------------- fitting
 
 
@@ -107,7 +124,25 @@ def precision_at_k(y: np.ndarray, p: np.ndarray, k: int = 5) -> float:
     return float(y[order].mean())
 
 
-def lead_times(frame: pd.DataFrame, threshold: float, step_hours: int = 24) -> list[dict]:
+def alert_mask(frame: pd.DataFrame, threshold: float, persistence: int = 1, step_hours: int = 24) -> pd.Series:
+    """Alert rule: p >= threshold on ``persistence`` consecutive grid steps of the same asset.
+    One-day blips are not alerts; the cost is persistence - 1 steps of lead time."""
+    alert = pd.Series(False, index=frame.index)
+    step = pd.Timedelta(hours=step_hours)
+    for _, g in frame.sort_values("timestamp").groupby("asset"):
+        hot = (g["p"] >= threshold).to_numpy()
+        ts = g["timestamp"].to_numpy()
+        run = 0
+        out = []
+        for i in range(len(g)):
+            contiguous = i > 0 and (ts[i] - ts[i - 1]) == np.timedelta64(int(step.total_seconds()), "s")
+            run = run + 1 if hot[i] and (contiguous or run == 0) else (1 if hot[i] else 0)
+            out.append(run >= persistence)
+        alert.loc[g.index] = out
+    return alert
+
+
+def lead_times(frame: pd.DataFrame, threshold: float, step_hours: int = 24, persistence: int = 1) -> list[dict]:
     """Per positive run (one per upcoming failure): first alert and lead time.
 
     The failure is estimated as one step after the last positive row, so the
@@ -115,6 +150,7 @@ def lead_times(frame: pd.DataFrame, threshold: float, step_hours: int = 24) -> l
     """
     out = []
     step = pd.Timedelta(hours=step_hours)
+    frame = frame.assign(alert=alert_mask(frame, threshold, persistence, step_hours))
     for asset, g in frame.sort_values("timestamp").groupby("asset"):
         pos = g[g["label"] == 1]
         if pos.empty:
@@ -124,7 +160,7 @@ def lead_times(frame: pd.DataFrame, threshold: float, step_hours: int = 24) -> l
         for run in np.split(np.arange(len(pos)), breaks):
             r = pos.iloc[run]
             fail_est = r["timestamp"].iloc[-1] + step
-            alerts = r[r["p"] >= threshold]
+            alerts = r[r["alert"]]
             first = alerts["timestamp"].iloc[0] if not alerts.empty else None
             out.append(
                 {
@@ -156,13 +192,13 @@ def choose_threshold(y: np.ndarray, p: np.ndarray) -> float:
     return best_t
 
 
-def evaluate(frame: pd.DataFrame, threshold: float, step_hours: int = 24) -> dict:
-    """frame: asset, timestamp, label (0/1), p."""
+def evaluate(frame: pd.DataFrame, threshold: float, step_hours: int = 24, persistence: int = 1) -> dict:
+    """frame: asset, timestamp, label (0/1), p. Alerts follow alert_mask (persistence)."""
     y = frame["label"].to_numpy(float)
     p = frame["p"].to_numpy(float)
-    lt = lead_times(frame, threshold, step_hours)
+    lt = lead_times(frame, threshold, step_hours, persistence)
     leads = [d["lead_time_days"] for d in lt if d["lead_time_days"] is not None]
-    false_alerts = int(((p >= threshold) & (y == 0)).sum())
+    false_alerts = int((alert_mask(frame, threshold, persistence, step_hours).to_numpy() & (y == 0)).sum())
     span_days = max((frame["timestamp"].max() - frame["timestamp"].min()) / pd.Timedelta(days=1), 1.0)
     asset_months = frame["asset"].nunique() * span_days / 30.0
     return {
@@ -172,6 +208,7 @@ def evaluate(frame: pd.DataFrame, threshold: float, step_hours: int = 24) -> dic
         "pr_auc": pr_auc(y, p),
         "precision_at_5": precision_at_k(y, p, 5),
         "threshold": threshold,
+        "persistence_days": persistence * step_hours // 24,
         "lead_time_days_mean": float(np.mean(leads)) if leads else None,
         "lead_times": lt,
         "failures_in_window": len(lt),
@@ -205,6 +242,8 @@ def train(
     l2: float = 1.0,
     run_id: str | None = None,
     step_hours: int = 24,
+    persistence: int = 1,
+    features: list[str] | None = None,
 ) -> dict:
     """Fit on the labelled feature table (output of models.predict.labels)."""
     if "label" not in table.columns:
@@ -214,7 +253,7 @@ def train(
     cutoff = pd.Timestamp(cutoff) if cutoff is not None else default_cutoff(table)
     rng = np.random.default_rng(seed)
 
-    cols = feature_columns(table)
+    cols = features if features is not None else feature_columns(table)
     tr, te = split(table, cutoff, horizon_days)
     if tr.empty or tr["label"].sum() == 0:
         pos = table.loc[table["label"] == 1, "timestamp"]
@@ -234,11 +273,11 @@ def train(
 
     ptr = _sigmoid(Xtr @ coef + intercept)
     threshold = choose_threshold(ytr, ptr)
-    tr_eval = evaluate(tr.assign(p=ptr), threshold, step_hours)
+    tr_eval = evaluate(tr.assign(p=ptr), threshold, step_hours, persistence)
 
     if not te.empty:
         pte = _sigmoid(scaler.transform(te[cols].to_numpy(float)) @ coef + intercept)
-        te_eval = evaluate(te.assign(p=pte), threshold, step_hours)
+        te_eval = evaluate(te.assign(p=pte), threshold, step_hours, persistence)
     else:
         te_eval = None
 
@@ -260,7 +299,7 @@ def train(
             "test_start": te["timestamp"].min().isoformat() if not te.empty else None,
             "test_end": te["timestamp"].max().isoformat() if not te.empty else None,
         },
-        "config": {"model": "logistic_regression_l2_newton", "l2": l2, "step_hours": step_hours},
+        "config": {"model": "logistic_regression_l2_newton", "l2": l2, "step_hours": step_hours, "persistence": persistence},
         "feature_names": cols,
         "scaler": {"mean": scaler.mean.tolist(), "std": scaler.std.tolist()},
         "coefficients": coef.tolist(),
@@ -356,12 +395,14 @@ def score(
     as_of = pd.Timestamp(as_of)
     f = features.copy()
     f["timestamp"] = pd.to_datetime(f["timestamp"])
-    latest = f[f["timestamp"] <= as_of].sort_values("timestamp").groupby("asset").tail(1)
-    if latest.empty:
+    persistence = int(art.get("config", {}).get("persistence", 1))
+    recent = f[f["timestamp"] <= as_of].sort_values("timestamp").groupby("asset").tail(persistence).copy()
+    if recent.empty:
         raise ValueError("no feature rows at or before as_of")
-    latest = latest.copy()
-    latest["p_fail"] = predict_proba(art, latest)
-    latest["alert"] = latest["p_fail"] >= art["threshold"]
+    recent["p"] = predict_proba(art, recent)
+    recent["alert"] = alert_mask(recent, art["threshold"], persistence, int(art.get("config", {}).get("step_hours", 24)))
+    latest = recent.groupby("asset").tail(1).copy()
+    latest["p_fail"] = latest["p"]
     rows = []
     for _, r in latest.iterrows():
         d = _drivers(art, r)

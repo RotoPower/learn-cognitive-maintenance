@@ -1,0 +1,23 @@
+# The fleet's previous year, used only to TRAIN the predict model. The demo plant
+# (faults.yaml, 2024) is the held-out test year, so every 2024 failure is out of sample.
+# Different seed, different onsets and durations, every failure mode at least twice.
+seed: 7
+start: 2023-01-01
+horizon_days: 365
+scenarios:
+  - {asset: BFP-1, mode: bearing_wear, onset_day: 40, duration_days: 30}
+  - {asset: BFP-1, mode: bearing_wear, onset_day: 230, duration_days: 36}
+  - {asset: BFP-2, mode: bearing_wear, onset_day: 120, duration_days: 26}
+  - {asset: GT-1, mode: compressor_fouling, onset_day: 60, duration_days: 55}
+  - {asset: GT-1, mode: compressor_fouling, onset_day: 250, duration_days: 65}
+  - {asset: CTF-1, mode: gearbox_wear, onset_day: 90, duration_days: 25}
+  - {asset: CTF-1, mode: gearbox_wear, onset_day: 280, duration_days: 21}
+  - {asset: BFP-2, event: sensor_outage, from_day: 150, to_day: 152}
+
+quirks:
+  dead_tags:
+    - GT1.BRG_TEMP_2          # the same failed transmitter as in 2024
+  missing_hours:
+    - {from_day: 77, hours: 4}
+  duplicated_timestamps:
+    - {day: 201, hour: 9}

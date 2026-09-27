@@ -1,0 +1,21 @@
+# Confirmation year for the predict model, created AFTER its configuration was frozen
+# (features, L2, alert rule chosen while looking at 2024). Never used for training or
+# for choosing anything: it only confirms the 2024 result on a year no one has seen.
+seed: 2025
+start: 2025-01-01
+horizon_days: 365
+scenarios:
+  - {asset: BFP-2, mode: bearing_wear, onset_day: 70, duration_days: 34}
+  - {asset: CTF-1, mode: gearbox_wear, onset_day: 150, duration_days: 23}
+  - {asset: GT-1, mode: compressor_fouling, onset_day: 180, duration_days: 50}
+  - {asset: BFP-1, mode: bearing_wear, onset_day: 260, duration_days: 28}
+  - {asset: CTF-1, mode: gearbox_wear, onset_day: 300, duration_days: 27}
+  - {asset: GT-1, event: sensor_outage, from_day: 100, to_day: 101}
+
+quirks:
+  dead_tags:
+    - GT1.BRG_TEMP_2
+  missing_hours:
+    - {from_day: 44, hours: 6}
+  duplicated_timestamps:
+    - {day: 222, hour: 3}

@@ -309,3 +309,54 @@ def test_cli_end_to_end(long: pd.DataFrame, plant: Plant, tmp_path: Path, monkey
     monkeypatch.delenv("PLANT_ADMIN_TOKEN", raising=False)
     with pytest.raises(SystemExit):
         cli.main(["upload", "--artifact", "nope", "--url", "http://x"])  # no token set
+
+
+# ------------------------------------------------- repair reset, persistence, feature sets
+
+
+def test_maintenance_log_is_cmms_only(plant: Plant) -> None:
+    log = plant.maintenance_log()
+    assert {e["kind"] for e in log} == {"corrective_repair"}
+    assert all(set(e) == {"kind", "asset_id", "timestamp", "description"} for e in log)  # no mode, onset, health
+    assert len(log) == len(plant.failures())
+
+
+def test_windows_reset_at_repairs(plant: Plant, long: pd.DataFrame) -> None:
+    repairs = F.load_repairs(plant.maintenance_log())
+    plain = F.build_features(long, repairs=repairs)
+    reset = F.build_features(long, repairs=repairs, reset_at_repairs=True)
+    rep = repairs[repairs["asset"] == "BFP1"]["timestamp"].min()
+    at = lambda f, t: f[(f["asset"] == "BFP1") & (f["timestamp"] == t)].iloc[0]
+    # the day after a repair: too few post-repair samples for a 7-day window -> NaN, not a pre-repair echo
+    day1 = rep + pd.Timedelta(days=1)
+    assert np.isnan(at(reset, day1)["VIB_DE__slope7d"]) and not np.isnan(at(plain, day1)["VIB_DE__slope7d"])
+    # far from any repair the two agree
+    quiet = rep - pd.Timedelta(days=40)
+    assert at(reset, quiet)["VIB_DE__mean7d"] == pytest.approx(at(plain, quiet)["VIB_DE__mean7d"])
+
+
+def test_alert_mask_persistence() -> None:
+    ts = pd.date_range("2024-01-01", periods=8, freq="24h")
+    p = [0.9, 0.1, 0.9, 0.9, 0.1, 0.9, 0.9, 0.9]
+    fr = pd.DataFrame({"asset": "A", "timestamp": ts, "p": p})
+    assert M.alert_mask(fr, 0.5, 1).tolist() == [x >= 0.5 for x in p]
+    assert M.alert_mask(fr, 0.5, 2).tolist() == [False, False, False, True, False, False, True, True]
+    gap = fr.drop(index=6)  # a missing day breaks the run
+    assert M.alert_mask(gap, 0.5, 2).tolist() == [False, False, False, True, False, False, False]
+
+
+def test_symptom_feature_set(feats: pd.DataFrame) -> None:
+    cols = M.select_features(feats, "symptom_slope7d")
+    assert cols and all(c.endswith("__slope7d") and c.split("__")[0] in M.SYMPTOM_TAGS for c in cols)
+    assert not any(c.startswith(("SPEED", "FLOW", "DISCH_PRESS", "LOAD__", "hours_since")) for c in cols)
+    with pytest.raises(ValueError):
+        M.select_features(feats, "nope")
+
+
+def test_persistence_reduces_false_alerts(table: pd.DataFrame) -> None:
+    cols = M.select_features(table, "symptom_slope7d")
+    one = M.train(table, horizon_days=H, seed=42, cutoff=CUTOFF, features=cols, persistence=1)
+    two = M.train(table, horizon_days=H, seed=42, cutoff=CUTOFF, features=cols, persistence=2)
+    assert one["coefficients"] == two["coefficients"]  # the rule changes alerts, not the fit
+    assert two["metrics"]["test"]["false_alert_rows"] <= one["metrics"]["test"]["false_alert_rows"]
+    assert two["config"]["persistence"] == 2 and two["feature_names"] == cols

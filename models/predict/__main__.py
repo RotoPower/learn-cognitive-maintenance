@@ -10,7 +10,10 @@ from pathlib import Path
 import pandas as pd
 
 from models.predict.features import build_features, load_long, load_repairs
-from models.predict.model import ARTIFACT_DIR, REPORTS_DIR, load_artifact, save_artifact, score, train, upload
+from models.predict.model import (
+    ARTIFACT_DIR, FEATURE_SETS, REPORTS_DIR, evaluate, load_artifact, predict_proba, save_artifact, score, select_features,
+    train, upload,
+)
 
 DERIVED = Path("data/derived")
 
@@ -25,7 +28,7 @@ def _guard(path: Path) -> Path:
 def cmd_features(a: argparse.Namespace) -> None:
     long = load_long(a.input)
     repairs = load_repairs(a.maintenance_log)
-    feats = build_features(long, as_of=a.as_of, repairs=repairs)
+    feats = build_features(long, as_of=a.as_of, repairs=repairs, reset_at_repairs=a.reset_at_repairs)
     date = pd.Timestamp(a.as_of).strftime("%Y-%m-%d")
     out = _guard(Path(a.out) if a.out else DERIVED / f"predict_features_{date}.parquet")
     feats.to_parquet(out, index=False)
@@ -34,7 +37,10 @@ def cmd_features(a: argparse.Namespace) -> None:
 
 def cmd_train(a: argparse.Namespace) -> None:
     table = pd.read_parquet(a.table)
-    art = train(table, horizon_days=a.horizon_days, seed=a.seed, cutoff=a.cutoff, l2=a.l2, run_id=a.run_id)
+    cols = select_features(table, a.feature_set)
+    art = train(table, horizon_days=a.horizon_days, seed=a.seed, cutoff=a.cutoff, l2=a.l2, run_id=a.run_id,
+                persistence=a.persistence, features=cols)
+    art["config"].update(feature_set=a.feature_set, reset_at_repairs=a.reset_at_repairs, table=Path(a.table).as_posix())
     path = save_artifact(art, Path(a.artifact_dir))
     te = art["metrics"]["test"] or {}
     print(f"run_id={art['run_id']} artifact={path.as_posix()}")
@@ -45,15 +51,37 @@ def cmd_score(a: argparse.Namespace) -> None:
     art = load_artifact(a.artifact, Path(a.artifact_dir))
     date = pd.Timestamp(a.as_of).strftime("%Y-%m-%d")
     fpath = Path(a.features) if a.features else DERIVED / f"predict_features_{date}.parquet"
+    if art.get("config", {}).get("reset_at_repairs"):
+        # A saved feature file cannot show whether its windows were reset at repairs, and an
+        # unreset one scores this artefact wrongly (post-repair echoes). Build them here.
+        if not (a.input and a.maintenance_log):
+            raise SystemExit(f"{art['run_id']} needs features reset at repairs: pass --input and --maintenance-log "
+                             "(saved --features files are not accepted for this artefact)")
+        fpath = Path("__rebuild__")
     if not fpath.exists():
         if not a.input:
             raise SystemExit(f"{fpath} not found; pass --features or --input to build them")
-        feats = build_features(load_long(a.input), as_of=a.as_of, repairs=load_repairs(a.maintenance_log))
+        feats = build_features(load_long(a.input), as_of=a.as_of, repairs=load_repairs(a.maintenance_log),
+                               reset_at_repairs=bool(art.get("config", {}).get("reset_at_repairs")))
     else:
         feats = pd.read_parquet(fpath)
     ranked = score(art, feats, a.as_of, report_dir=Path(a.report_dir))
     print(f"artifact={art['run_id']} as_of={a.as_of} report={(Path(a.report_dir) / f'predict_{date}.md').as_posix()}")
     print(ranked[["asset", "p_fail", "alert", "interpretation"]].to_string(index=False))
+
+
+def cmd_evaluate(a: argparse.Namespace) -> None:
+    """Score a saved artefact on any labelled table (e.g. a holdout year) with its own alert rule."""
+    art = load_artifact(a.artifact, Path(a.artifact_dir))
+    t = pd.read_parquet(a.table)
+    t["timestamp"] = pd.to_datetime(t["timestamp"])
+    t = t[t["label"].notna()]
+    if a.after:
+        t = t[t["timestamp"] > pd.Timestamp(a.after)]
+    t = t.assign(p=predict_proba(art, t))
+    cfg = art.get("config", {})
+    m = evaluate(t, art["threshold"], int(cfg.get("step_hours", 24)), int(cfg.get("persistence", 1)))
+    print(json.dumps({"artifact": art["run_id"], "table": Path(a.table).as_posix(), **m}, indent=2, default=str))
 
 
 def cmd_upload(a: argparse.Namespace) -> None:
@@ -72,6 +100,7 @@ def main(argv: list[str] | None = None) -> None:
     f.add_argument("--as-of", required=True)
     f.add_argument("--maintenance-log", default=None, help="JSON dump of GET /maintenance/log")
     f.add_argument("--out", default=None)
+    f.add_argument("--reset-at-repairs", action="store_true", help="windows never cross a corrective repair")
     f.set_defaults(fn=cmd_features)
 
     t = sub.add_parser("train", help="fit logistic regression on a labelled table")
@@ -80,6 +109,9 @@ def main(argv: list[str] | None = None) -> None:
     t.add_argument("--cutoff", default=None, help="ISO timestamp; default = 70%% point of the table")
     t.add_argument("--seed", type=int, default=42)
     t.add_argument("--l2", type=float, default=1.0)
+    t.add_argument("--persistence", type=int, default=1, help="alert after N consecutive daily scores above threshold")
+    t.add_argument("--feature-set", choices=FEATURE_SETS, default="all")
+    t.add_argument("--reset-at-repairs", action="store_true", help="record that the table's windows reset at repairs")
     t.add_argument("--run-id", default=None)
     t.add_argument("--artifact-dir", default=str(ARTIFACT_DIR))
     t.set_defaults(fn=cmd_train)
@@ -93,6 +125,13 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--artifact-dir", default=str(ARTIFACT_DIR))
     s.add_argument("--report-dir", default=str(REPORTS_DIR))
     s.set_defaults(fn=cmd_score)
+
+    e = sub.add_parser("evaluate", help="metrics of a saved artefact on a labelled table (holdout)")
+    e.add_argument("--artifact", required=True)
+    e.add_argument("--table", required=True)
+    e.add_argument("--after", default=None, help="only rows after this timestamp")
+    e.add_argument("--artifact-dir", default=str(ARTIFACT_DIR))
+    e.set_defaults(fn=cmd_evaluate)
 
     u = sub.add_parser("upload", help="POST an artefact to /admin/model_artifacts")
     u.add_argument("--artifact", required=True)
