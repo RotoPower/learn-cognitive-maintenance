@@ -210,6 +210,19 @@ function runRow(env: Env, runId: string, task: string, asOf: string, art: string
     .bind(runId, task, asOf, art, started, new Date().toISOString(), JSON.stringify(summary));
 }
 
+/** Health must answer even when D1 does not (e.g. the free-tier daily limit): 503 + reason, not error 1101. */
+export async function safeHealth(service: string, check: () => Promise<Response>): Promise<Response> {
+  try {
+    return await check();
+  } catch (e) {
+    const error = String((e as Error).message ?? e);
+    return Response.json(
+      { service, status: "degraded", d1_limit_exceeded: /daily row (read|write) limit/i.test(error), error: error.slice(0, 300) },
+      { status: 503 },
+    );
+  }
+}
+
 async function health(env: Env): Promise<Response> {
   // Open endpoint: one indexed row.
   const last = await env.DB.prepare("SELECT run_id, as_of, finished FROM runs ORDER BY started DESC LIMIT 1").first<{ run_id: string; as_of: string; finished: string }>();
@@ -228,7 +241,7 @@ export default {
 
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
-    if (url.pathname === "/health" && req.method === "GET") return health(env);
+    if (url.pathname === "/health" && req.method === "GET") return safeHealth("plant-scoring", () => health(env));
     if (url.pathname === "/score" && req.method === "POST") {
       if (!env.ADMIN_TOKEN || req.headers.get("authorization") !== `Bearer ${env.ADMIN_TOKEN}`)
         return Response.json({ detail: "ADMIN token required" }, { status: 403 });

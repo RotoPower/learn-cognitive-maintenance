@@ -131,6 +131,19 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
   };
 }
 
+/** Health must answer even when D1 does not (e.g. the free-tier daily limit): 503 + reason, not error 1101. */
+export async function safeHealth(service: string, check: () => Promise<Response>): Promise<Response> {
+  try {
+    return await check();
+  } catch (e) {
+    const error = String((e as Error).message ?? e);
+    return Response.json(
+      { service, status: "degraded", d1_limit_exceeded: /daily row (read|write) limit/i.test(error), error: error.slice(0, 300) },
+      { status: 503 },
+    );
+  }
+}
+
 async function health(env: Env): Promise<Response> {
   // Open endpoint: index-only queries, no full-table counts.
   const last = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings").first<{ ts: string | null }>();
@@ -150,7 +163,7 @@ export default {
 
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
-    if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) return health(env);
+    if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) return safeHealth("plant-ingest", () => health(env));
     if (req.method === "POST" && url.pathname === "/ingest") {
       const auth = req.headers.get("authorization") ?? "";
       const tok = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : req.headers.get("x-api-key");

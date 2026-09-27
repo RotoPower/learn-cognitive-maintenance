@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ingestOnce } from "../src/index";
+import worker, { ingestOnce } from "../src/index";
 import type { Env, Fetcher } from "../src/index";
 
 const TAGS = ["PLANT.LOAD", "GT1.EXH_TEMP", "BFP1.FLOW", "BFP2.VIB_DE"];
@@ -125,6 +125,14 @@ describe("ingestOnce", () => {
 });
 
 describe("http surface", () => {
+  it("health answers 503 with the reason when D1 fails (not error 1101)", async () => {
+    const broken = { ...env, DB: { prepare() { throw new Error("D1_ERROR: Your account has exceeded D1's free tier daily row read limit."); } } };
+    const r = await worker.fetch(new Request("http://x/health"), broken as never, {} as never);
+    expect(r.status).toBe(503);
+    const b = (await r.json()) as { status: string; d1_limit_exceeded: boolean; service: string };
+    expect(b).toMatchObject({ status: "degraded", d1_limit_exceeded: true, service: "plant-ingest" });
+  });
+
   it("health is open and reports the last ingested hour", async () => {
     await ingestOnce(testEnv(), fakeApi("2024-09-01T05:00:00").fetcher);
     const r = await SELF.fetch("http://ingest/health");

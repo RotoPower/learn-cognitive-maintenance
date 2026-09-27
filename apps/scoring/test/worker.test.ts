@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import fixture from "./fixtures/scoring.json";
-import { scoreOnce } from "../src/index";
+import worker, { scoreOnce } from "../src/index";
 import type { Env, Fetcher } from "../src/index";
 import { HOUR_MS, ms } from "../src/score";
 
@@ -122,6 +122,14 @@ describe("scoreOnce", () => {
 });
 
 describe("http surface", () => {
+  it("health answers 503 with the reason when D1 fails (not error 1101)", async () => {
+    const broken = { ...env, DB: { prepare() { throw new Error("D1_ERROR: Your account has exceeded D1's free tier daily row read limit."); } } };
+    const r = await worker.fetch(new Request("http://x/health"), broken as never, {} as never);
+    expect(r.status).toBe(503);
+    const b = (await r.json()) as { status: string; d1_limit_exceeded: boolean; service: string };
+    expect(b).toMatchObject({ status: "degraded", d1_limit_exceeded: true, service: "plant-scoring" });
+  });
+
   it("health is open; POST /score needs the admin token", async () => {
     const h = await SELF.fetch("http://scoring/health");
     expect(h.status).toBe(200);
