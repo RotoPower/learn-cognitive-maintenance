@@ -182,8 +182,9 @@ def test_latest(env) -> None:
 
 def test_maintenance_log_and_workorders(env) -> None:
     c, _, _ = env
-    # at 2024-09-01 no scripted repair has happened yet (first failure is 2024-09-27)
-    assert c.get("/maintenance/log", headers=READ).json() == []
+    # at 2024-09-01 only the full plant's early-2024 repairs have happened (CWP1, TX1, HRSG1)
+    early = [(e["asset_id"], e["timestamp"]) for e in c.get("/maintenance/log", headers=READ).json()]
+    assert early == [("CWP1", "2024-04-30T00:00:00"), ("TX1", "2024-06-19T00:00:00"), ("HRSG1", "2024-07-19T00:00:00")]
     r = c.post("/maintenance/workorder", json={"asset_id": "bfp-2", "type": "inspection", "description": "vib check"}, headers=READ)
     assert r.status_code == 201
     wo = r.json()
@@ -193,7 +194,7 @@ def test_maintenance_log_and_workorders(env) -> None:
 
     # jump past the BFP2 failure: the corrective repair appears, but only that one
     c.post("/clock/jump", json={"to": "2024-10-01T00:00"}, headers=ADMIN)
-    log = c.get("/maintenance/log", headers=READ).json()
+    log = [e for e in c.get("/maintenance/log", headers=READ).json() if e["timestamp"] >= "2024-09-01"]
     kinds = [(e["kind"], e["asset_id"]) for e in log]
     assert kinds == [("workorder", "BFP2"), ("corrective_repair", "BFP2")]
     assert log[1]["timestamp"] == "2024-09-27T00:00:00"
@@ -206,7 +207,9 @@ def test_ground_truth(env) -> None:
     c, _, _ = env
     gt = c.get("/admin/ground_truth", headers=ADMIN).json()
     assert gt["seed"] == 42
-    assert [f["asset"] for f in gt["failures"]] == ["BFP2", "GT1", "CTF1"]
+    assert len(gt["failures"]) == len(Plant.from_yaml(seed=42).failures()) == 15
+    story = [(f["asset"], f["failure"]) for f in gt["failures"] if f["asset"] in ("BFP2", "CTF1") or f["failure"] == "2024-11-26T00:00:00"]
+    assert story == [("BFP2", "2024-09-27T00:00:00"), ("GT1", "2024-11-26T00:00:00"), ("CTF1", "2024-11-21T00:00:00")]  # the 2024 demo story
     assert gt["events"][0]["asset"] == "BFP1"
     assert gt["health_now"]["BFP2"] < 1.0  # 2024-09-01 is inside the BFP2 degradation window
     assert gt["health_now"]["GT1"] == 1.0
@@ -229,7 +232,7 @@ def test_inject_fault(env) -> None:
     # overlapping injection is refused and leaves state unchanged
     r = c.post("/admin/inject_fault", json={**body, "onset": "2024-11-05T00:00"}, headers=ADMIN)
     assert r.status_code == 409
-    assert len(c.get("/admin/ground_truth", headers=ADMIN).json()["failures"]) == 4
+    assert len(c.get("/admin/ground_truth", headers=ADMIN).json()["failures"]) == 15 + 1
     assert c.post("/admin/inject_fault", json={**body, "mode": "nope"}, headers=ADMIN).status_code == 422
 
 
@@ -241,7 +244,7 @@ def test_reset(env) -> None:
 
     r = c.post("/admin/reset", json={"seed": 7}, headers=ADMIN)
     assert r.json() == {"seed": 7, "sim_time": "2024-01-01T00:00:00", "speed": 60.0}
-    assert len(c.get("/admin/ground_truth", headers=ADMIN).json()["failures"]) == 3
+    assert len(c.get("/admin/ground_truth", headers=ADMIN).json()["failures"]) == 15
     assert app.state.sim.workorders == []
     c.post("/clock/jump", json={"to": "2024-06-01T00:00"}, headers=ADMIN)
     after = c.get("/tags/GT1.EXH_TEMP/history", params={"from": "2024-03-01", "to": "2024-03-01"}, headers=READ).json()["points"][0]["value"]

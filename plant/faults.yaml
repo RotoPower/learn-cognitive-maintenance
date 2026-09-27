@@ -1,7 +1,8 @@
 seed: 42
 start: 2024-01-01
-horizon_days: 365
+horizon_days: 731            # 2024-01-01 .. 2025-12-31 (docs/design/full-plant.md)
 scenarios:
+  # --- 2024: the original demo story, unchanged -------------------------------
   - asset: BFP-2
     mode: bearing_wear
     onset_day: 240
@@ -18,6 +19,21 @@ scenarios:
     event: sensor_outage
     from_day: 200
     to_day: 203
+  # --- 2024: full plant ---------------------------------------------------------
+  - {asset: TX1, mode: oil_degradation, onset_day: 40, duration_days: 130}        # fails 2024-06-19
+  - {asset: CWP1, mode: seal_leak, onset_day: 95, duration_days: 25}              # fails 2024-04-30
+  - {asset: HRSG1, mode: tube_leak, onset_day: 180, duration_days: 20}            # fails 2024-07-19
+  - {asset: HRSG2, event: sensor_outage, from_day: 350, to_day: 352}
+  # --- 2025 ---------------------------------------------------------------------
+  - {asset: GT2, mode: compressor_fouling, onset_day: 380, duration_days: 55}     # fails 2025-03-11
+  - {asset: ST1, mode: blade_erosion, onset_day: 410, duration_days: 100}         # fails 2025-05-25
+  - {asset: GEN1, mode: winding_overheat, onset_day: 470, duration_days: 30}      # fails 2025-05-15
+  - {asset: BFP3, mode: bearing_wear, onset_day: 520, duration_days: 30}          # fails 2025-07-04
+  - {asset: CWP2, mode: seal_leak, onset_day: 560, duration_days: 25}             # fails 2025-08-08
+  - {asset: HRSG2, mode: tube_leak, onset_day: 600, duration_days: 18}            # fails 2025-09-10
+  - {asset: CTF2, mode: gearbox_wear, onset_day: 630, duration_days: 25}          # fails 2025-10-17
+  - {asset: GT1, mode: compressor_fouling, onset_day: 640, duration_days: 60}     # fails 2025-12-01
+  - {asset: CWP1, mode: bearing_wear, onset_day: 660, duration_days: 35}          # fails 2025-11-26
 
 # Realism quirks applied by generate(). Real historian exports have all of these;
 # the data pipeline is expected to find them.

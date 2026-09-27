@@ -111,12 +111,19 @@ def test_health_reaches_zero_then_repaired(plant: Plant) -> None:
 def test_failures_match_script(plant: Plant) -> None:
     got = {(f["asset"], f["mode"], f["onset"], f["failure"]) for f in plant.failures()}
     d = lambda day: datetime(2024, 1, 1) + (datetime(2024, 1, 2) - datetime(2024, 1, 1)) * day  # noqa: E731
-    assert got == {
+    # the original 2024 story is unchanged ...
+    assert {
         ("BFP2", "bearing_wear", d(240), d(270)),
         ("GT1", "compressor_fouling", d(270), d(330)),
         ("CTF1", "gearbox_wear", d(300), d(325)),
-    }
-    assert plant.events() == [{"asset": "BFP1", "event": "sensor_outage", "from": d(200), "to": d(203)}]
+    } <= got
+    # ... and the two-year script adds twelve failures, every mode at least once
+    assert len(got) == 15 and {m for _, m, _, _ in got} == set(FAULT_MODES)
+    assert all(fail <= d(731) for _, _, _, fail in got)
+    assert plant.events() == [
+        {"asset": "BFP1", "event": "sensor_outage", "from": d(200), "to": d(203)},
+        {"asset": "HRSG2", "event": "sensor_outage", "from": d(350), "to": d(352)},
+    ]
 
 
 def test_overlapping_scenarios_rejected() -> None:
@@ -232,12 +239,12 @@ def test_generated_frame_has_quirks(plant: Plant) -> None:
     assert df["BFP2.FLOW"].notna().all()
 
     # row count: 8760 - 5 missing + 1 duplicate
-    assert len(df) == 365 * 24 - 5 + 1
+    assert len(df) == int(plant.horizon_h) - 5 + 1
 
 
 def test_generate_without_quirks_is_clean(plant: Plant) -> None:
     df = plant.generate(freq_h=1.0, quirks=False)
-    assert len(df) == 365 * 24
+    assert len(df) == int(plant.horizon_h) == 731 * 24
     assert not df["timestamp"].duplicated().any()
 
 

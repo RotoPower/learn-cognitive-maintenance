@@ -72,7 +72,7 @@ def test_admin_commands_require_flag_and_token(transport) -> None:
     assert code == 3 and "PLANT_ADMIN_TOKEN" in text
     code, text = run(["--admin", "ground-truth"], transport, ENV_ADMIN)
     gt = json.loads(text)
-    assert code == 0 and [f["asset"] for f in gt["failures"]] == ["BFP2", "GT1", "CTF1"]
+    assert code == 0 and len(gt["failures"]) == 15 and {"BFP2", "GT1", "CTF1"} <= {f["asset"] for f in gt["failures"]}
 
 
 def test_admin_with_read_token_is_forbidden(transport) -> None:
