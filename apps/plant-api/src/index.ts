@@ -161,8 +161,13 @@ async function handle(req: Request, env: Env): Promise<Response> {
     requireAdmin(req, env);
     const b = await body<{ speed?: number }>(req);
     if (typeof b.speed !== "number" || b.speed < 0 || b.speed > 86_400 * 30) throw new HttpError(422, "speed must be a number in [0, 2592000]");
-    const r = await clockStub(env).setSpeed(b.speed);
-    return json({ sim_time: isoNaive(new Date(r.simMs)), speed: r.speed });
+    // Re-anchor at the clamped time: otherwise a clock that ran past the horizon gets
+    // frozen far in the future and a later speed-up never "comes back".
+    const { plant } = await currentPlant(env);
+    const stub = clockStub(env);
+    if ((await stub.now()).simMs > plant.end.getTime()) await stub.jump(plant.end.getTime());
+    const r = await stub.setSpeed(b.speed);
+    return json({ sim_time: isoNaive(new Date(Math.min(r.simMs, plant.end.getTime()))), speed: r.speed });
   }
   if (path === "/clock/jump" && method === "POST") {
     requireAdmin(req, env);

@@ -35,6 +35,7 @@ function fakeApi(simHour: string) {
 }
 
 const testEnv = (): Env => env as unknown as Env;
+const countRows = async () => (await env.DB.prepare("SELECT COUNT(*) AS n FROM readings").first<{ n: number }>())?.n ?? 0;
 
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM readings").run();
@@ -47,7 +48,7 @@ describe("ingestOnce", () => {
     expect(r.sim_hour).toBe("2024-09-01T05:00:00");
     expect(r.inserted_latest).toBe(TAGS.length);
     expect(r.backfilled_hours).toBe(0);
-    expect(r.total_rows).toBe(TAGS.length);
+    expect(await countRows()).toBe(TAGS.length);
     expect(calls.length).toBe(1); // no history calls on the first run
     const rows = await env.DB.prepare("SELECT tag, ts, value FROM readings ORDER BY tag").all<{ tag: string; ts: string; value: number }>();
     expect(rows.results.map((x) => x.tag)).toEqual([...TAGS].sort());
@@ -59,7 +60,8 @@ describe("ingestOnce", () => {
     await ingestOnce(testEnv(), fetcher);
     await ingestOnce(testEnv(), fetcher);
     const r = await ingestOnce(testEnv(), fetcher);
-    expect(r.total_rows).toBe(TAGS.length);
+    expect(r.inserted_latest).toBe(0); // hour already stored: no writes (paused or clamped clock)
+    expect(await countRows()).toBe(TAGS.length);
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE tag='GT1.EXH_TEMP'").first<{ n: number }>();
     expect(n?.n).toBe(1);
   });
@@ -70,7 +72,7 @@ describe("ingestOnce", () => {
     const r = await ingestOnce(testEnv(), fetcher);
     expect(r.backfilled_hours).toBe(0);
     expect(calls.length).toBe(1);
-    expect(r.total_rows).toBe(2 * TAGS.length);
+    expect(await countRows()).toBe(2 * TAGS.length);
   });
 
   it("backfills the gap after a clock jump, bounded by MAX_BACKFILL_HOURS", async () => {
@@ -81,7 +83,7 @@ describe("ingestOnce", () => {
     expect(r.backfilled_rows).toBe(9 * TAGS.length);
     expect(r.skipped_backfill_hours).toBe(0);
     expect(calls.filter((c) => c.includes("/history")).length).toBe(TAGS.length);
-    expect(r.total_rows).toBe(11 * TAGS.length);
+    expect(await countRows()).toBe(11 * TAGS.length);
     const hours = await env.DB.prepare("SELECT DISTINCT ts FROM readings ORDER BY ts").all<{ ts: string }>();
     expect(hours.results.map((h) => h.ts.slice(11, 13))).toEqual(["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]);
 
@@ -97,7 +99,7 @@ describe("ingestOnce", () => {
     const { fetcher, calls } = fakeApi("2024-09-01T10:00:00");
     const r = await ingestOnce(seeded, fetcher);
     expect(r.backfilled_hours).toBe(5);
-    expect(r.total_rows).toBe(6 * TAGS.length); // 05..09 seeded + 10 current
+    expect(await countRows()).toBe(6 * TAGS.length); // 05..09 seeded + 10 current
     expect(calls.filter((c) => c.includes("/history")).length).toBe(TAGS.length);
     // second run: no gap, no more history calls
     const again = fakeApi("2024-09-01T11:00:00");
@@ -127,9 +129,8 @@ describe("http surface", () => {
     await ingestOnce(testEnv(), fakeApi("2024-09-01T05:00:00").fetcher);
     const r = await SELF.fetch("http://ingest/health");
     expect(r.status).toBe(200);
-    const b = (await r.json()) as { last_ingested_hour: string; rows: number; tags: number };
+    const b = (await r.json()) as { last_ingested_hour: string; tags: number };
     expect(b.last_ingested_hour).toBe("2024-09-01T05:00:00");
-    expect(b.rows).toBe(TAGS.length);
     expect(b.tags).toBe(TAGS.length);
   });
 

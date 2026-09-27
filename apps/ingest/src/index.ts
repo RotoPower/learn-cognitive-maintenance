@@ -11,7 +11,13 @@
  * `/tags/{tag}/history`, bounded by MAX_BACKFILL_HOURS. Outage readings are
  * stored as NULL, exactly as the API reports them.
  *
- * HTTP: GET /health (status, last ingested hour, row count) is open;
+ * D1 budget: the free tier allows 5M rows read and 100k rows written per day, and
+ * this runs 1440 times a day. Every query here must use an index and touch a
+ * handful of rows: never COUNT(*) the whole table (at ~200k readings that alone
+ * blew the read limit). When the clock is paused or clamped at the horizon, the
+ * current hour is already stored and nothing is written.
+ *
+ * HTTP: GET /health (status, last ingested hour, tags in it) is open;
  * POST /ingest (manual trigger) needs the ADMIN token.
  */
 
@@ -57,7 +63,6 @@ export interface IngestResult {
   backfilled_hours: number;
   backfilled_rows: number;
   skipped_backfill_hours: number;
-  total_rows: number;
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "");
@@ -88,10 +93,11 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
   const simHour = latest.timestamp;
   const tags = Object.keys(latest.values);
 
-  const inserted = await upsert(
-    env,
-    tags.map((tag) => ({ tag, ts: simHour, value: latest.values[tag] })),
-  );
+  // Already stored (paused clock, clamped horizon, several crons per sim hour): skip the write.
+  const have = await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE ts = ?").bind(simHour).first<{ n: number }>();
+  const inserted = (have?.n ?? 0) >= tags.length
+    ? 0
+    : await upsert(env, tags.map((tag) => ({ tag, ts: simHour, value: latest.values[tag] })));
 
   // Backfill: hours strictly between the previously newest row and this hour. On the
   // very first run (empty table) seed the trailing INITIAL_BACKFILL_HOURS so dashboards
@@ -116,20 +122,20 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
     }
   }
 
-  const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM readings").first<{ n: number }>();
   return {
     sim_hour: simHour,
     inserted_latest: inserted,
     backfilled_hours: backfilledHours,
     backfilled_rows: backfilledRows,
     skipped_backfill_hours: skipped,
-    total_rows: total?.n ?? 0,
   };
 }
 
 async function health(env: Env): Promise<Response> {
-  const last = await env.DB.prepare("SELECT MAX(ts) AS ts, COUNT(*) AS n, COUNT(DISTINCT tag) AS tags FROM readings").first<{ ts: string | null; n: number; tags: number }>();
-  return Response.json({ service: "plant-ingest", last_ingested_hour: last?.ts ?? null, rows: last?.n ?? 0, tags: last?.tags ?? 0, plant_api: env.PLANT_API_URL });
+  // Open endpoint: index-only queries, no full-table counts.
+  const last = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings").first<{ ts: string | null }>();
+  const tags = last?.ts ? await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE ts = ?").bind(last.ts).first<{ n: number }>() : null;
+  return Response.json({ service: "plant-ingest", last_ingested_hour: last?.ts ?? null, tags: tags?.n ?? 0, plant_api: env.PLANT_API_URL });
 }
 
 export default {

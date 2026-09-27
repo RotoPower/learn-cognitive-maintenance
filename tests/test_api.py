@@ -261,3 +261,7 @@ def test_model_artifacts(env, tmp_path) -> None:
     assert saved["seed"] == 42 and saved["metrics"]["auc"] == 0.91 and "uploaded_at" in saved
     assert c.get("/admin/model_artifacts", headers=ADMIN).json() == ["colab-2024-09-07-a"]
     assert c.post("/admin/model_artifacts", json={"run_id": "../evil", "seed": 1}, headers=ADMIN).status_code == 422
+    got = c.get("/admin/model_artifacts/colab-2024-09-07-a", headers=ADMIN)
+    assert got.status_code == 200 and got.json()["model"]["params"] == {"n": 200}
+    assert c.get("/admin/model_artifacts/nope", headers=ADMIN).status_code == 404
+    assert c.get("/admin/model_artifacts/colab-2024-09-07-a", headers=READ).status_code == 403

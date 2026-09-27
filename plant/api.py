@@ -405,6 +405,15 @@ def create_app(
             return []
         return sorted(p.stem for p in artifact_dir.glob("*.json"))
 
+    @app.get("/admin/model_artifacts/{run_id}", dependencies=ADMIN)
+    def get_artifact(run_id: str) -> dict[str, Any]:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", run_id):
+            raise HTTPException(422, "run_id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+        path = artifact_dir / f"{run_id}.json"
+        if not path.exists():
+            raise HTTPException(404, "no such artefact")
+        return json.loads(path.read_text(encoding="utf-8"))
+
     return app
 
 

@@ -47,7 +47,9 @@ describe("clock", () => {
     expect(end.sim_time).toBe("2024-12-31T00:00:00");
     const latest = (await (await get("/tags/latest?asset_id=GT1", READ)).json()) as { timestamp: string };
     expect(latest.timestamp).toBe("2024-12-31T00:00:00");
-    await post("/clock/speed", { speed: 0 }, ADMIN);
+    // changing speed after running past the horizon re-anchors at the horizon end
+    const stopped = (await (await post("/clock/speed", { speed: 0 }, ADMIN)).json()) as { sim_time: string };
+    expect(stopped.sim_time).toBe("2024-12-31T00:00:00");
     const j = await post("/clock/jump", { to: "2024-10-01T00:00" }, ADMIN);
     expect(((await j.json()) as { sim_time: string }).sim_time).toBe("2024-10-01T00:00:00");
     expect((await post("/clock/jump", { to: "2030-01-01T00:00" }, ADMIN)).status).toBe(422);

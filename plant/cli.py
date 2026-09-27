@@ -13,6 +13,7 @@
     uv run plantctl --admin jump --to 2024-09-01
     uv run plantctl --admin speed --speed 3600
     uv run plantctl --admin artifacts
+    uv run plantctl --admin artifact --run-id <run_id>
     uv run plantctl --admin upload-artifact --file models/artifacts/<run_id>.json
 
 Config from the environment (a ``.env`` in the repo root is loaded if present):
@@ -157,6 +158,10 @@ def cmd_artifacts(c: Client, a) -> Any:
     return c.call("GET", "/admin/model_artifacts")
 
 
+def cmd_artifact(c: Client, a) -> Any:
+    return c.call("GET", f"/admin/model_artifacts/{urllib.parse.quote(a.run_id, safe='')}")
+
+
 def cmd_upload_artifact(c: Client, a) -> Any:
     art = json.loads(Path(a.file).read_text(encoding="utf-8"))
     if {"run_id", "seed"} <= set(art) and "model" in art:
@@ -175,7 +180,7 @@ def cmd_upload_artifact(c: Client, a) -> Any:
     return c.call("POST", "/admin/model_artifacts", body=body)
 
 
-ADMIN_COMMANDS = {"ground-truth", "inject-fault", "reset", "jump", "speed", "artifacts", "upload-artifact"}
+ADMIN_COMMANDS = {"ground-truth", "inject-fault", "reset", "jump", "speed", "artifacts", "artifact", "upload-artifact"}
 
 
 # -------------------------------------------------------------------- output
@@ -279,6 +284,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--speed", type=float, required=True)
     s.set_defaults(fn=cmd_speed)
     sub.add_parser("artifacts", help="[admin] list uploaded model artefacts").set_defaults(fn=cmd_artifacts)
+    s = sub.add_parser("artifact", help="[admin] fetch one stored model artefact")
+    s.add_argument("--run-id", required=True)
+    s.set_defaults(fn=cmd_artifact)
     s = sub.add_parser("upload-artifact", help="[admin] POST an artefact JSON")
     s.add_argument("--file", required=True)
     s.set_defaults(fn=cmd_upload_artifact)

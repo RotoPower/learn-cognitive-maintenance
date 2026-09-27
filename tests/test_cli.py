@@ -101,6 +101,11 @@ def test_upload_artifact_roundtrip(transport, tmp_path) -> None:
     code, text = run(["--admin", "artifacts"], transport, ENV_ADMIN)
     assert json.loads(text) == ["r1"]
     assert json.loads((tmp_path / "art" / "r1.json").read_text())["model"]["coefficients"] == [0.5]
+    code, text = run(["--admin", "artifact", "--run-id", "r1"], transport, ENV_ADMIN)
+    assert code == 0 and json.loads(text)["model"]["coefficients"] == [0.5]
+    code, text = run(["--admin", "artifact", "--run-id", "nope"], transport, ENV_ADMIN)
+    assert code == 1 and "404" in text
+    assert run(["artifact", "--run-id", "r1"], transport)[0] == 3  # admin-only
 
 
 def test_api_errors_and_out_guard(transport, tmp_path) -> None:
