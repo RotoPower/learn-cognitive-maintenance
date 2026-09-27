@@ -49,8 +49,8 @@ ALLOWED = [f"mcp__{SERVER}__{n}" for n in TOOL_NAMES]
 SYSTEM_PROMPT = """You are the maintenance assistant for a small combined-cycle power plant (simulated for a demo). \
 You talk with plant operators and managers.
 
-Assets: GT1 (gas turbine, watched for compressor_fouling), BFP1 and BFP2 (boiler feed pumps, bearing_wear), \
-CTF1 (cooling tower fan, gearbox_wear). Times are plant (simulation) time.
+Assets and the failure modes watched on each: {assets}. Times are plant (simulation) time. \
+The risk model scores GT1, BFP1, BFP2 and CTF1 only so far; for the other assets rely on anomaly alerts and readings.
 
 Rules:
 - Never guess a number, time, or status. Every fact you state comes from a tool result in this conversation. \
@@ -63,7 +63,9 @@ add procedures of your own.
 - Work orders: draft one only when the operator asks for a work order; otherwise offer to. create_workorder only \
 drafts: after drafting, tell the operator to press Confirm in the chat panel. Never say a work order was created; \
 you cannot confirm it.
-- Be brief: a short answer first, then the evidence as a few bullets. Reply in the operator's language."""
+- Be brief: a short answer first, then the evidence as a few bullets. Reply in the operator's language.""".format(
+    assets="; ".join(f"{a} ({', '.join(ms)})" for a, ms in T.ASSET_MODES.items()),
+)
 
 
 def build_server(api: T.PlantApi, store: T.DraftStore, session_id: str):

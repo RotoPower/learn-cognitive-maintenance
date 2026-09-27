@@ -57,7 +57,7 @@ class FakePlant:
 
 def test_asset_status_cites_units_baselines_and_risk() -> None:
     s = T.get_asset_status(FakePlant(), "BFP-2")
-    assert s["asset_id"] == "BFP2" and s["failure_mode_watched"] == "bearing_wear"
+    assert s["asset_id"] == "BFP2" and s["failure_modes_watched"] == ["bearing_wear"]
     assert s["readings"]["BFP2.VIB_DE"] == {"value": 3.1, "unit": "mm/s", "baseline": 1.8, "vs_baseline_pct": 72.2}
     assert s["readings"]["BFP2.BRG_TEMP_DE"]["note"].startswith("no reading")
     assert s["plant_load"]["value"] == 0.82
@@ -203,3 +203,22 @@ def test_tools_degrade_when_the_database_is_down() -> None:
     assert e["trend_6h"]["BFP2.VIB_DE"]["max"] == 3.3 and e["alerts"] == T.UNAVAILABLE and e["risk"] == T.UNAVAILABLE
     r = T.get_recommendations(DbDownPlant(), "bearing_wear")
     assert r["source"] == "docs/playbook/bearing_wear.md"  # local playbook fallback
+
+
+def test_plant_tables_from_docs_match_the_simulator() -> None:
+    """The assistant reads assets, modes, units and baselines from docs/plant.md; they must
+    be the simulator's (test only: the assistant never imports plant.sim)."""
+    from plant.sim import MODE_ASSETS, TAGS
+
+    assert T.ASSETS == tuple(TAGS)
+    assert set(T.MODES) == set(MODE_ASSETS)
+    assert {a: sorted(ms) for a, ms in T.ASSET_MODES.items()} == {
+        a: sorted(m for m, assets in MODE_ASSETS.items() if a in assets) for a in TAGS
+    }
+    for asset, tags in TAGS.items():
+        for tag, spec in tags.items():
+            unit, base = T.TAG_INFO[f"{asset}.{tag}"]
+            assert unit, f"{asset}.{tag}"
+            assert base == (None if spec.dead else spec.baseline), f"{asset}.{tag}"
+    assert T.DEAD_TAGS == {f"{a}.{t}" for a, tags in TAGS.items() for t, s in tags.items() if s.dead}
+    assert "CWP1 (bearing_wear, seal_leak)" in G.SYSTEM_PROMPT and "TX1 (oil_degradation)" in G.SYSTEM_PROMPT

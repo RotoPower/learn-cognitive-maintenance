@@ -19,26 +19,52 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
-ASSETS = ("GT1", "BFP1", "BFP2", "CTF1")
-MODES = ("bearing_wear", "compressor_fouling", "gearbox_wear")
-ASSET_MODE = {"GT1": "compressor_fouling", "BFP1": "bearing_wear", "BFP2": "bearing_wear", "CTF1": "gearbox_wear"}
 WORKORDER_TYPES = ("inspection", "repair", "replacement", "lubrication", "other")
 SEVERITIES = ("info", "warning", "critical")
-PLAYBOOK_DIR = Path(__file__).resolve().parents[3] / "docs" / "playbook"
+DOCS_DIR = Path(__file__).resolve().parents[3] / "docs"
+PLAYBOOK_DIR = DOCS_DIR / "playbook"
 
-# (unit, baseline at plant load 0.75 and full health) from docs/plant.md
-TAG_INFO: dict[str, tuple[str, float | None]] = {
-    "PLANT.LOAD": ("fraction", 0.75),
-    "GT1.LOAD_MW": ("MW", 90), "GT1.EXH_TEMP": ("degC", 540), "GT1.CDP": ("bar", 15.5), "GT1.FUEL_FLOW": ("kg/s", 6.2),
-    "GT1.VIB_1": ("mm/s", 2.1), "GT1.BRG_TEMP_1": ("degC", 78), "GT1.BRG_TEMP_2": ("degC", None),  # dead sensor
-    "CTF1.SPEED": ("rpm", 118), "CTF1.VIB": ("mm/s", 2.4), "CTF1.GBX_OIL_TEMP": ("degC", 58), "CTF1.MOTOR_CURR": ("A", 95),
-}
-for _p in ("BFP1", "BFP2"):
-    TAG_INFO.update({
-        f"{_p}.FLOW": ("t/h", 260), f"{_p}.DISCH_PRESS": ("bar", 165), f"{_p}.VIB_DE": ("mm/s", 1.8),
-        f"{_p}.VIB_NDE": ("mm/s", 1.5), f"{_p}.BRG_TEMP_DE": ("degC", 62), f"{_p}.MOTOR_CURR": ("A", 310),
-    })
-DEAD_TAGS = {"GT1.BRG_TEMP_2"}
+
+def _plant_tables(text: str):
+    """Assets, modes and tag units/baselines from docs/plant.md (tests/test_docs.py keeps
+    that file in step with the simulator). Family rows such as `GTx.CDP` apply to every
+    asset of the family; an asset's own row (`GT1.BRG_TEMP_2`) overrides it."""
+    rows = [[c.strip() for c in line.strip().strip("|").split("|")] for line in text.splitlines() if line.lstrip().startswith("|")]
+    assets = tuple(r[0].strip("`") for r in rows if re.fullmatch(r"`[A-Z]+\d`", r[0]))
+    asset_modes: dict[str, list[str]] = {a: [] for a in assets}
+    for r in rows:
+        if len(r) >= 3 and re.fullmatch(r"`[a-z_]+`", r[0]):
+            for a in (x.strip() for x in r[1].split(",")):
+                asset_modes[a].append(r[0].strip("`"))
+    family: dict[str, tuple[str, float]] = {}
+    own: dict[str, tuple[str, float]] = {}
+    dead: set[str] = set()
+    for r in rows:
+        m = re.fullmatch(r"`([A-Z]+)(x|\d)\.([A-Z0-9_]+)`", r[0])
+        if not m or len(r) < 3:
+            continue
+        unit, base = r[1], float(r[2])
+        if m.group(2) == "x":
+            family[f"{m.group(1)}.{m.group(3)}"] = (unit, base)
+        else:
+            own[r[0].strip("`")] = (unit, base)
+            if "dead sensor" in " ".join(r[3:]).lower():
+                dead.add(r[0].strip("`"))
+    info: dict[str, tuple[str, float | None]] = {"PLANT.LOAD": ("fraction", 0.75)}
+    for a in assets:
+        fam = a.rstrip("0123456789")
+        for key, v in family.items():
+            if key.split(".", 1)[0] == fam:
+                info[f"{a}.{key.split('.', 1)[1]}"] = v
+    info.update(own)
+    for tag in dead:
+        info[tag] = (info[tag][0], None)  # a constant, not a baseline to compare with
+    modes = tuple(dict.fromkeys(m for ms in asset_modes.values() for m in ms))
+    return assets, modes, asset_modes, info, dead
+
+
+# (unit, baseline at plant load 0.75 and full health) per tag; failure modes per asset
+ASSETS, MODES, ASSET_MODES, TAG_INFO, DEAD_TAGS = _plant_tables((DOCS_DIR / "plant.md").read_text(encoding="utf-8"))
 
 
 class PlantApi(Protocol):
@@ -118,13 +144,13 @@ def get_asset_status(api: PlantApi, asset_id: str) -> dict:
             risk["previous"] = {"as_of": preds[1]["as_of"], "p_fail": _r(preds[1]["p_fail"])}
     out = {
         "asset_id": asset,
-        "failure_mode_watched": ASSET_MODE[asset],
+        "failure_modes_watched": ASSET_MODES[asset],
         "sim_time": clock.get("sim_time"),
         "readings_at": latest.get("timestamp"),
         "readings": {tag: _reading(tag, v) for tag, v in latest.get("values", {}).items()},
         "plant_load": _reading("PLANT.LOAD", (plant.get("values") or {}).get("PLANT.LOAD")),
         "open_alerts": [_alert(a) for a in alerts] if alerts is not None else UNAVAILABLE,
-        "risk": risk if risk else (UNAVAILABLE if preds is None else "no risk score yet (scoring has not run for this asset)"),
+        "risk": risk if risk else (UNAVAILABLE if preds is None else "no risk score for this asset (not scored yet, or not covered by the risk model)"),
         "last_repair": (repairs[-1]["timestamp"] if repairs else None) if repairs is not None else UNAVAILABLE,
         "open_workorders": [
             {k: e.get(k) for k in ("id", "type", "timestamp", "status", "description")}
