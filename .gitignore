@@ -5,3 +5,4 @@ data/derived/
 __pycache__/
 *.pyc
 .env
+.approvals/

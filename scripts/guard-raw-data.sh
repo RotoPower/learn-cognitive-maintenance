@@ -46,7 +46,7 @@ if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
     if RAW.search(path):
         block(f"{tool} targets {path}")
 
-elif tool == "Bash":
+elif tool in ("Bash", "PowerShell"):
     cmd = str(inp.get("command", ""))
     if RAW.search(cmd):
         shell_writers = re.compile(
