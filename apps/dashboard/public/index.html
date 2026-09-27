@@ -78,18 +78,13 @@
     <div class="demo-grid">
       <button class="btn" data-demo="jump7" type="button">Jump clock +7 days</button>
       <form class="inline" id="jump-form">
-        <label>Jump to day <input type="number" id="jump-day" min="1" max="366" required inputmode="numeric"></label>
+        <label>Jump to day <input type="number" id="jump-day" min="1" max="731" required inputmode="numeric"></label>
         <button class="btn" type="submit">Go</button>
       </form>
       <button class="btn" data-demo="score" type="button">Run scoring now</button>
       <form class="inline" id="inject-form">
         <label>Inject fault on
-          <select id="inject-asset">
-            <option value="BFP1">BFP1 (bearing wear)</option>
-            <option value="BFP2">BFP2 (bearing wear)</option>
-            <option value="GT1">GT1 (compressor fouling)</option>
-            <option value="CTF1">CTF1 (gearbox wear)</option>
-          </select>
+          <select id="inject-asset"></select>
         </label>
         <button class="btn" type="submit">Inject</button>
       </form>

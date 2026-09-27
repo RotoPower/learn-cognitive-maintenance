@@ -61,7 +61,34 @@ function render() {
       <div class="sub">${o.predict.trusted ? "risk above threshold" : "experimental model"}</div></div>
     <div class="card kpi"><div class="label">Alerts, last 7 days</div><div class="value">${k.alerts_7d}</div></div>`;
 
-  $("#fleet").innerHTML = o.assets.map((a) => `
+  const groups = [];
+  for (const a of o.assets) {
+    const g = groups.find((x) => x.name === a.group) ?? groups[groups.push({ name: a.group, assets: [] }) - 1];
+    g.assets.push(a);
+  }
+  $("#fleet").innerHTML = groups.map((g) => `
+    <div class="fleet-group">
+      <h3 class="group-h">${esc(g.name)}</h3>
+      <div class="fleet-grid">${g.assets.map(assetCard).join("")}</div>
+    </div>`).join("");
+
+  const sel = $("#asset-filter");
+  if (sel.options.length === 1) for (const a of o.assets) sel.add(new Option(a.asset_id, a.asset_id));
+  const inj = $("#inject-asset");
+  if (!inj.options.length) {
+    for (const a of o.assets) for (const m of a.modes) inj.add(new Option(`${a.asset_id} (${m.replace(/_/g, " ")})`, `${a.asset_id}|${m}`));
+  }
+  if (o.horizon_end) {
+    const days = Math.floor((Date.parse(o.horizon_end + "Z") - Date.parse("2024-01-01T00:00:00Z")) / 86_400_000) + 1;
+    $("#jump-day").max = String(days);
+    $("#jump-day").placeholder = `1–${days}`;
+  }
+  renderTables();
+}
+
+function assetCard(a) {
+  const o = state.overview;
+  return `
     <button class="card asset ${a.status}" data-asset="${esc(a.asset_id)}" type="button" aria-label="${esc(a.asset_id)}: ${STATUS[a.status].label}. Open details">
       <div class="name"><h3>${esc(a.asset_id)}</h3>${statusHtml(a.status)}</div>
       <div class="desc">${esc(a.description)}</div>
@@ -71,11 +98,7 @@ function render() {
         <dt>Open alerts</dt><dd>${a.open_alerts}</dd>
         <dt>Since last maintenance</dt><dd>${a.days_since_maintenance == null ? "none logged" : `${a.days_since_maintenance} days`}</dd>
       </dl>
-    </button>`).join("");
-
-  const sel = $("#asset-filter");
-  if (sel.options.length === 1) for (const a of o.assets) sel.add(new Option(a.asset_id, a.asset_id));
-  renderTables();
+    </button>`;
 }
 
 function renderTables() {
@@ -133,7 +156,7 @@ function renderAsset(d) {
        <div class="muted">Features as of ${fmtTime(p.as_of)}, alert threshold ${pct(p.threshold)}.</div></div>`
     : `<p class="muted">No risk score yet. Run scoring from the demo controls.</p>`;
   const actions = `<ul class="plain">${d.actions.items.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
-    <p class="muted">${d.actions.source === "playbook" ? "From the operator playbook." : "Interim guidance for " + esc(d.mode.replace(/_/g, " ")) + "; the operator playbook replaces it in Part E."}</p>`;
+    <p class="muted">${d.actions.source === "playbook" ? `From the operator playbook: ${esc(d.mode.replace(/_/g, " "))}${d.modes?.length > 1 ? ` (this asset can also have ${esc(d.modes.filter((m) => m !== d.mode).join(", ").replace(/_/g, " "))})` : ""}.` : "Interim guidance for " + esc(d.mode.replace(/_/g, " ")) + "; the operator playbook replaces it in Part E."}</p>`;
   const wos = d.workorders.length
     ? `<ul class="plain">${d.workorders.map((w) => `<li>${esc(w.id)} · ${esc(w.type)} · ${fmtTime(w.timestamp)} · ${esc(w.status)}${w.description ? ` — ${esc(w.description)}` : ""}</li>`).join("")}</ul>`
     : `<p class="muted">No work orders for this asset.</p>`;
@@ -320,7 +343,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   $("#jump-form").addEventListener("submit", (ev) => { ev.preventDefault(); runDemo("jump", { day: Number($("#jump-day").value) }); });
-  $("#inject-form").addEventListener("submit", (ev) => { ev.preventDefault(); runDemo("inject", { asset_id: $("#inject-asset").value }); });
+  $("#inject-form").addEventListener("submit", (ev) => { ev.preventDefault(); const [asset_id, mode] = $("#inject-asset").value.split("|"); runDemo("inject", { asset_id, mode }); });
 
   loadOverview();
   setInterval(loadOverview, 60_000);

@@ -14,7 +14,7 @@ function fakePlant() {
   const injected: { asset: string; mode: string }[] = [];
   const iso = (ms: number) => new Date(ms).toISOString().slice(0, 19);
   const tags: Record<string, string[]> = {
-    GT1: ["GT1.EXH_TEMP", "GT1.BRG_TEMP_2"], BFP1: ["BFP1.VIB_DE"], BFP2: ["BFP2.VIB_DE", "BFP2.BRG_TEMP_DE"], CTF1: ["CTF1.VIB"], PLANT: ["PLANT.LOAD"],
+    GT1: ["GT1.EXH_TEMP", "GT1.BRG_TEMP_2"], BFP1: ["BFP1.VIB_DE"], BFP2: ["BFP2.VIB_DE", "BFP2.BRG_TEMP_DE"], CTF1: ["CTF1.VIB"], CWP1: ["CWP1.SEAL_LEAK_FLOW"], PLANT: ["PLANT.LOAD"],
   };
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);

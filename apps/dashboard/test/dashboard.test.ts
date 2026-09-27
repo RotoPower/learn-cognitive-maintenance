@@ -33,12 +33,15 @@ describe("GET /api/overview", () => {
     const o = JSON.parse(await text(r));
     expect(o.sim_time).toBe("2024-09-20T13:00:00");
     const byId = Object.fromEntries(o.assets.map((a: { asset_id: string }) => [a.asset_id, a]));
-    expect(Object.keys(byId).sort()).toEqual(["BFP1", "BFP2", "CTF1", "GT1"]); // PLANT is not an asset card
+    // PLANT is not an asset card; cards come in process order, grouped by system
+    expect(o.assets.map((a: { asset_id: string }) => a.asset_id)).toEqual(["GT1", "BFP1", "BFP2", "CWP1", "CTF1"]);
+    expect(byId.CWP1).toMatchObject({ group: "Cooling water", modes: ["seal_leak", "bearing_wear"] });
+    expect(byId.GT1).toMatchObject({ group: "Gas turbines", modes: ["compressor_fouling"] });
     expect(byId.BFP2).toMatchObject({ status: "critical", risk: 0.97, risk_alert: true, top_driver: "BFP2.VIB_DE", top_driver_source: "anomaly", open_alerts: 2 });
     expect(byId.CTF1.status).toBe("healthy"); // its alert lies in the sim future
     expect(byId.BFP1.days_since_maintenance).toBe(111);
     expect(byId.GT1.days_since_maintenance).toBeNull();
-    expect(o.kpis).toMatchObject({ healthy: 3, warning: 0, critical: 1, predicted_failures_30d: 1, alerts_7d: 2, open_workorders: 0 });
+    expect(o.kpis).toMatchObject({ healthy: 4, warning: 0, critical: 1, predicted_failures_30d: 1, alerts_7d: 2, open_workorders: 0 });
     expect(o.predict).toMatchObject({ trusted: true, threshold: 0.256, run_id: "score_2024-09-20_predict" }); // not the future run
     expect(o.alerts.map((a: { tag: string }) => a.tag)).not.toContain("CTF1.VIB");
   });
@@ -104,6 +107,9 @@ describe("demo controls", () => {
     expect((await post("/api/demo/jump", { day: 10 })).status).toBe(422); // backwards
     const end = await post("/api/demo/jump", { day: 366 });
     expect((await end.json() as { result: { sim_time: string } }).result.sim_time).toBe("2024-12-31T00:00:00"); // clamped
+    const past = await post("/api/demo/jump", { day: 367 }); // the fake horizon ends on day 366
+    expect(past.status).toBe(422);
+    expect((await past.json() as { detail: string }).detail).toMatch(/1\.\.366/);
   });
 
   it("run scoring, inject fault (mode follows the asset), reset clears scoring outputs", async () => {
@@ -116,6 +122,11 @@ describe("demo controls", () => {
     const again = await post("/api/demo/inject", { asset_id: "CTF1" });
     expect(again.status).toBe(409);
     expect((await again.json() as { detail: string }).detail).toMatch(/overlaps/);
+    const cwp = await post("/api/demo/inject", { asset_id: "CWP1", mode: "bearing_wear" });
+    expect(JSON.parse(await text(cwp)).result.injected).toMatchObject({ asset: "CWP1", mode: "bearing_wear" });
+    const wrong = await post("/api/demo/inject", { asset_id: "BFP1", mode: "seal_leak" });
+    expect(wrong.status).toBe(422);
+    expect((await wrong.json() as { detail: string }).detail).toMatch(/BFP1 can have bearing_wear/);
     const reset = await post("/api/demo/reset", {});
     expect(reset.status).toBe(200);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM alerts").first<{ n: number }>())?.n).toBe(0);

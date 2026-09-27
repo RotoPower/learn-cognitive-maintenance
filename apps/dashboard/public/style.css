@@ -97,7 +97,9 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; gap: 24p
 .status .icon { font-size: 12px; }
 
 /* Fleet board */
-.fleet { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.fleet { display: grid; gap: 18px; }
+.fleet-group .group-h { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
+.fleet-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .asset { text-align: left; font: inherit; color: inherit; cursor: pointer; display: grid; gap: 10px; border-top: 4px solid var(--good); }
 .asset.warning { border-top-color: var(--warning); }
 .asset.critical { border-top-color: var(--critical); }
@@ -173,12 +175,12 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
 .result.error { color: var(--critical); }
 
 @media (max-width: 900px) {
-  .kpis, .fleet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis, .fleet-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
   .kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .fleet { grid-template-columns: minmax(0, 1fr); }
+  .fleet-grid { grid-template-columns: minmax(0, 1fr); }
   .kpi .value { font-size: 28px; }
   .top { position: static; }
 }

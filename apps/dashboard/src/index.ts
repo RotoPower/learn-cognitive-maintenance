@@ -103,7 +103,27 @@ export function clearCache(): void { cache.clear(); }
 
 // ------------------------------------------------------------------ status
 
-const ASSET_MODES: Record<string, string> = { GT1: "compressor_fouling", BFP1: "bearing_wear", BFP2: "bearing_wear", CTF1: "gearbox_wear" };
+/** Failure modes each asset can have (plant/sim.py MODE_ASSETS); the first is the default
+ *  for "Inject fault". */
+const ASSET_MODES: Record<string, string[]> = {
+  GT1: ["compressor_fouling"], GT2: ["compressor_fouling"],
+  HRSG1: ["tube_leak"], HRSG2: ["tube_leak"],
+  ST1: ["blade_erosion"], GEN1: ["winding_overheat"], TX1: ["oil_degradation"],
+  BFP1: ["bearing_wear"], BFP2: ["bearing_wear"], BFP3: ["bearing_wear"],
+  CWP1: ["seal_leak", "bearing_wear"], CWP2: ["seal_leak", "bearing_wear"],
+  CTF1: ["gearbox_wear"], CTF2: ["gearbox_wear"],
+};
+/** Board layout: the plant's systems in process order. */
+const ASSET_GROUPS: [string, string[]][] = [
+  ["Gas turbines", ["GT1", "GT2"]],
+  ["Heat recovery steam generators", ["HRSG1", "HRSG2"]],
+  ["Steam turbine, generator, transformer", ["ST1", "GEN1", "TX1"]],
+  ["Feedwater pumps", ["BFP1", "BFP2", "BFP3"]],
+  ["Cooling water", ["CWP1", "CWP2", "CTF1", "CTF2"]],
+];
+const ASSET_ORDER = ASSET_GROUPS.flatMap(([, ids]) => ids);
+const groupOf = (asset: string): string => ASSET_GROUPS.find(([, ids]) => ids.includes(asset))?.[0] ?? "Other";
+const unknownAsset = () => new HttpError(422, `asset_id must be one of ${ASSET_ORDER.join(", ")}`);
 
 /** Interim actions until the Part E playbook fills D1 `playbook`. */
 const FALLBACK_ACTIONS: Record<string, string[]> = {
@@ -167,7 +187,8 @@ export async function overview(env: Env) {
     const workorders = log.filter((e) => e.kind === "workorder" && ms(e.timestamp) <= now).reverse();
     const lastRun = await env.DB.prepare("SELECT as_of FROM runs WHERE task = 'anomaly' AND as_of <= ? ORDER BY as_of DESC LIMIT 1").bind(simNow).first<{ as_of: string }>();
 
-    const board = assets.filter((a) => a.asset_id in ASSET_MODES).map((a) => {
+    const known = assets.filter((a) => a.asset_id in ASSET_MODES).sort((x, y) => ASSET_ORDER.indexOf(x.asset_id) - ASSET_ORDER.indexOf(y.asset_id));
+    const board = known.map((a) => {
       const pr = preds.rows.find((r) => r.asset_id === a.asset_id);
       const d = pr ? parseDrivers(pr) : null;
       const status = assetStatus(a.asset_id, alerts, pr && d ? { p: pr.p_fail, threshold: d.threshold } : null, now, trusted);
@@ -179,6 +200,8 @@ export async function overview(env: Env) {
       return {
         asset_id: a.asset_id,
         description: a.description,
+        group: groupOf(a.asset_id),
+        modes: ASSET_MODES[a.asset_id],
         status,
         risk: pr ? pr.p_fail : null,
         risk_alert: pr && d ? pr.p_fail >= d.threshold : false,
@@ -236,16 +259,20 @@ export async function assetDetail(env: Env, assetId: string) {
     const preds = await latestPredictions(env, simNow);
     const pr = preds.rows.find((r) => r.asset_id === assetId);
     const d = pr ? parseDrivers(pr) : null;
-    const mode = ASSET_MODES[assetId];
+    // The playbook shown is the mode the current evidence points at (CWP has two).
+    const modes = ASSET_MODES[assetId];
+    const evidence = [...alerts.filter((x) => x.status === "open").map((x) => x.interpretation ?? ""), d?.interpretation ?? ""].join(" ");
+    const mode = modes.find((m) => evidence.includes(m)) ?? modes[0];
     const playbook = await env.DB.prepare("SELECT body FROM playbook WHERE mode = ? AND section = 'actions'").bind(mode).first<{ body: string }>();
     return {
       asset_id: assetId,
       sim_time: simNow,
       mode,
+      modes,
       trends,
       alerts,
       prediction: pr && d ? { p_fail: pr.p_fail, horizon_days: pr.horizon_days, as_of: pr.as_of, threshold: d.threshold, drivers: d.drivers.slice(0, 3), interpretation: d.interpretation, trusted: env.PREDICT_TRUSTED === "on" } : null,
-      actions: playbook ? { source: "playbook", items: playbook.body.split(/\n+/).map((s) => s.replace(/^[-*]\s*/, "")).filter(Boolean) } : { source: "interim", items: FALLBACK_ACTIONS[mode] },
+      actions: playbook ? { source: "playbook", items: playbook.body.split(/\n+/).map((s) => s.replace(/^[-*]\s*/, "")).filter(Boolean) } : { source: "interim", items: FALLBACK_ACTIONS[mode] ?? [`Open the ${mode.replace(/_/g, " ")} playbook (docs/playbook/${mode}.md); load it into the plant with scripts/load_playbook.py.`] },
       workorders: log.filter((e) => e.kind === "workorder" && ms(e.timestamp) <= now).reverse().slice(0, 20),
       repairs: log.filter((e) => e.kind === "corrective_repair" && ms(e.timestamp) <= now).map((e) => e.timestamp),
     };
@@ -287,7 +314,7 @@ async function body<T>(req: Request): Promise<T> {
 
 export async function createWorkorder(env: Env, req: Request) {
   const b = await body<{ asset_id?: string; type?: string; description?: string; confirm?: boolean }>(req);
-  if (!b.asset_id || !(b.asset_id in ASSET_MODES)) throw new HttpError(422, "asset_id must be one of GT1, BFP1, BFP2, CTF1");
+  if (!b.asset_id || !(b.asset_id in ASSET_MODES)) throw unknownAsset();
   const type = b.type ?? "inspection";
   if (!["inspection", "repair", "replacement", "lubrication", "other"].includes(type)) throw new HttpError(422, "bad type");
   const description = (b.description ?? "").trim().slice(0, 500);
@@ -351,24 +378,27 @@ export async function demo(env: Env, req: Request, action: string) {
     let target = now + 7 * DAY_MS;
     if (action === "jump") {
       const { day } = await body<{ day?: number }>(req);
-      if (typeof day !== "number" || !Number.isInteger(day) || day < 1 || day > 366) throw new HttpError(422, "day must be an integer in 1..366");
+      const lastDay = Math.floor((end - HORIZON_START) / DAY_MS) + 1;
+      if (typeof day !== "number" || !Number.isInteger(day) || day < 1 || day > lastDay) throw new HttpError(422, `day must be an integer in 1..${lastDay}`);
       target = HORIZON_START + (day - 1) * DAY_MS;
     }
     if (target <= now) throw new HttpError(422, "the clock only moves forward; use Reset to start over");
     target = Math.min(target, end);
-    if (target <= now) throw new HttpError(422, "already at the end of the simulated year; use Reset");
+    if (target <= now) throw new HttpError(422, "already at the end of the simulated period; use Reset");
     await spend(env, viewer, "jump");
     result = await upstream(env, "plant", "/clock/jump", { method: "POST", body: { to: iso(target) }, admin: true });
   } else if (action === "score") {
     await spend(env, viewer, "score");
     result = await upstream(env, "scoring", "/score", { method: "POST" });
   } else if (action === "inject") {
-    const { asset_id } = await body<{ asset_id?: string }>(req);
-    if (!asset_id || !(asset_id in ASSET_MODES)) throw new HttpError(422, "asset_id must be one of GT1, BFP1, BFP2, CTF1");
+    const { asset_id, mode: asked } = await body<{ asset_id?: string; mode?: string }>(req);
+    if (!asset_id || !(asset_id in ASSET_MODES)) throw unknownAsset();
+    const mode = asked ?? ASSET_MODES[asset_id][0];
+    if (!ASSET_MODES[asset_id].includes(mode)) throw new HttpError(422, `${asset_id} can have ${ASSET_MODES[asset_id].join(" or ")}, not ${mode}`);
     await spend(env, viewer, "inject");
     result = await upstream(env, "plant", "/admin/inject_fault", {
       method: "POST", admin: true,
-      body: { asset: asset_id, mode: ASSET_MODES[asset_id], onset: iso(now + 3_600_000), duration_days: 14 },
+      body: { asset: asset_id, mode, onset: iso(now + 3_600_000), duration_days: 14 },
     });
   } else if (action === "reset") {
     await spend(env, viewer, "reset");
