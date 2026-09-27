@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plant health</title>
+  <meta name="description" content="Cognitive maintenance demo: fleet health, alerts, and work orders for a simulated combined-cycle block.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Combined-cycle block</h1>
+      <span class="badge" title="All data comes from a simulator">Demo — simulated data</span>
+    </div>
+    <div class="clock">
+      <span class="muted">Sim time</span>
+      <strong id="sim-time">—</strong>
+      <span class="muted" id="last-scored"></span>
+    </div>
+    <button class="btn" id="open-demo" type="button">Demo controls</button>
+  </header>
+
+  <main>
+    <p class="notice" id="notice" hidden></p>
+
+    <section aria-labelledby="kpi-h">
+      <h2 id="kpi-h" class="sr-only">Key figures</h2>
+      <div class="kpis" id="kpis"><p class="muted">Loading the plant…</p></div>
+    </section>
+
+    <section aria-labelledby="fleet-h">
+      <div class="section-head">
+        <h2 id="fleet-h">Fleet</h2>
+        <span class="muted" id="predict-note"></span>
+      </div>
+      <div class="fleet" id="fleet"></div>
+    </section>
+
+    <section aria-labelledby="alerts-h" class="tables">
+      <div class="section-head">
+        <h2 id="alerts-h">Alerts and work orders</h2>
+        <label class="filter">Asset
+          <select id="asset-filter"><option value="">All</option></select>
+        </label>
+      </div>
+      <div class="table-grid">
+        <div class="card">
+          <h3>Alerts</h3>
+          <div class="scroll"><table id="alerts-table"><thead><tr><th>Asset</th><th>Signal</th><th>From</th><th>To</th><th class="num">Peak z</th><th>Reading</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card">
+          <h3>Work orders</h3>
+          <div class="scroll"><table id="wo-table"><thead><tr><th>Id</th><th>Asset</th><th>Type</th><th>Raised</th><th>Status</th><th>Description</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="drawer-title" role="dialog">
+    <div class="drawer-head">
+      <div>
+        <h2 id="drawer-title">Asset</h2>
+        <p class="muted" id="drawer-sub"></p>
+      </div>
+      <button class="icon-btn" id="close-drawer" type="button" aria-label="Close">×</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <dialog id="demo">
+    <form method="dialog" class="demo-head">
+      <h2>Demo controls</h2>
+      <button class="icon-btn" value="close" aria-label="Close">×</button>
+    </form>
+    <p class="muted">These change the shared demo plant for everyone viewing it. Limited to 5 actions per hour per viewer.</p>
+    <div class="demo-grid">
+      <button class="btn" data-demo="jump7" type="button">Jump clock +7 days</button>
+      <form class="inline" id="jump-form">
+        <label>Jump to day <input type="number" id="jump-day" min="1" max="366" required inputmode="numeric"></label>
+        <button class="btn" type="submit">Go</button>
+      </form>
+      <button class="btn" data-demo="score" type="button">Run scoring now</button>
+      <form class="inline" id="inject-form">
+        <label>Inject fault on
+          <select id="inject-asset">
+            <option value="BFP1">BFP1 (bearing wear)</option>
+            <option value="BFP2">BFP2 (bearing wear)</option>
+            <option value="GT1">GT1 (compressor fouling)</option>
+            <option value="CTF1">CTF1 (gearbox wear)</option>
+          </select>
+        </label>
+        <button class="btn" type="submit">Inject</button>
+      </form>
+      <button class="btn danger" data-demo="reset" type="button">Reset plant</button>
+    </div>
+    <p class="result" id="demo-result" role="status" aria-live="polite"></p>
+  </dialog>
+
+  <div class="tooltip" id="tooltip" hidden></div>
+  <script src="app.js" defer></script>
+</body>
+</html>

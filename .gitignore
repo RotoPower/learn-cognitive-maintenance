@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .env
 .approvals/
+apps/.wrangler-shared/

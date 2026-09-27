@@ -1,0 +1,81 @@
+# Dashboard Worker (D3): public page in ./public, /api/* answered by src/index.ts.
+# Shares the plant-api D1 database; calls the plant API and the scoring Worker over
+# Service Bindings, holding the tokens server-side (never shipped to the browser).
+name = "plant-dashboard"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[vars]
+PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
+SCORING_URL = "http://127.0.0.1:8789"         # wrangler dev of apps/scoring
+PREDICT_TRUSTED = "off"                       # predict is NO-GO: risk is shown, but does not colour status
+CACHE_SECONDS = "30"
+DEMO_PER_VIEWER_HOUR = "5"
+DEMO_GLOBAL_HOUR = "60"
+SCORE_GLOBAL_DAY = "30"
+WORKORDER_PER_VIEWER_HOUR = "10"
+
+# Secrets: READ_TOKEN, ADMIN_TOKEN (plant API), SCORING_ADMIN_TOKEN (scoring POST /score;
+# defaults to ADMIN_TOKEN) -> `wrangler secret put ... --env staging`; locally in .dev.vars
+
+# 60 API requests per minute per viewer (hashed IP).
+[[ratelimits]]
+name = "API_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plant-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# ---------------------------------------------------------------- staging
+[env.staging]
+name = "plant-dashboard-staging"
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", SCORING_URL = "https://plant-scoring-staging.rotopower.workers.dev", PREDICT_TRUSTED = "off", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "5", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", WORKORDER_PER_VIEWER_HOUR = "10" }
+
+[[env.staging.ratelimits]]
+name = "API_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "plant-staging"
+database_id = "f639c0e5-a838-4d97-8b87-3f4328d1758f"
+
+[[env.staging.services]]
+binding = "PLANT"
+service = "plant-api-staging"
+
+[[env.staging.services]]
+binding = "SCORING"
+service = "plant-scoring-staging"
+
+# ------------------------------------------------------------- production
+[env.production]
+name = "plant-dashboard"
+vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", SCORING_URL = "https://plant-scoring.rotopower.workers.dev", PREDICT_TRUSTED = "off", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "5", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", WORKORDER_PER_VIEWER_HOUR = "10" }
+
+[[env.production.ratelimits]]
+name = "API_LIMITER"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "plant-production"
+database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-production"
+
+[[env.production.services]]
+binding = "PLANT"
+service = "plant-api"
+
+[[env.production.services]]
+binding = "SCORING"
+service = "plant-scoring"
