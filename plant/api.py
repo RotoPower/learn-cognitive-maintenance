@@ -90,6 +90,7 @@ class State:
         self.config_path = Path(config_path)
         self.extra_scenarios: list[Scenario] = []
         self.workorders: list[dict[str, Any]] = []
+        self.playbook: dict[str, dict[str, str]] = {}  # mode -> section -> markdown; survives reset
         self.plant: Plant = Plant.from_yaml(self.config_path, seed=seed)
         self.clock = SimClock(clock_start or self.plant.start, speed, real_now)
 
@@ -144,6 +145,14 @@ class InjectFaultBody(BaseModel):
 
 class ResetBody(BaseModel):
     seed: int = 42
+
+
+PLAYBOOK_SECTIONS = ("symptoms", "checks", "actions", "spares", "lead_time")
+
+
+class PlaybookBody(BaseModel):
+    mode: str
+    sections: dict[str, str]
 
 
 class ArtifactBody(BaseModel):
@@ -404,6 +413,20 @@ def create_app(
         if not artifact_dir.exists():
             return []
         return sorted(p.stem for p in artifact_dir.glob("*.json"))
+
+    @app.post("/admin/playbook", dependencies=ADMIN, status_code=201)
+    def load_playbook(body: PlaybookBody) -> dict[str, Any]:
+        if body.mode not in FAULT_MODES:
+            raise HTTPException(422, f"mode must be one of {', '.join(sorted(FAULT_MODES))}")
+        bad = [k for k, v in body.sections.items() if k not in PLAYBOOK_SECTIONS or not v.strip() or len(v) > 8000]
+        if not body.sections or bad:
+            raise HTTPException(422, f"sections: non-empty strings (<= 8000 chars) keyed by {', '.join(PLAYBOOK_SECTIONS)}")
+        st.playbook[body.mode] = {k: v.strip() for k, v in body.sections.items()}
+        return {"mode": body.mode, "sections": list(body.sections)}
+
+    @app.get("/playbook", dependencies=READ)
+    def get_playbook(mode: str | None = None) -> dict[str, dict[str, str]]:
+        return {m: s for m, s in sorted(st.playbook.items()) if mode is None or m == mode}
 
     @app.get("/admin/model_artifacts/{run_id}", dependencies=ADMIN)
     def get_artifact(run_id: str) -> dict[str, Any]:

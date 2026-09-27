@@ -8,12 +8,15 @@
  *   GET  /maintenance/log?asset_id= READ      POST /maintenance/workorder      READ
  *   GET  /admin/ground_truth        ADMIN     POST /admin/inject_fault, /admin/reset
  *   GET  /admin/model_artifacts     ADMIN     POST /admin/model_artifacts
+ *   GET  /playbook?mode=            READ      POST /admin/playbook             ADMIN
  *
  * State: the Clock Durable Object (clock + scenario overlay) and D1 (work orders,
  * artefacts, ground-truth mirror, assets). Readings are never stored here: they
  * are recomputed from (seed, asset, tag, sim_time) on every request.
  */
 import { DEFAULT_FAULTS } from "./faults";
+
+const PLAYBOOK_SECTIONS = ["symptoms", "checks", "actions", "spares", "lead_time"];
 import { ASSETS, ASSET_INFO, FAULT_MODES, PLANT_LOAD_TAG, Plant, TAGS, canonicalAsset, isoNaive, parseNaiveIso, splitTag } from "./sim";
 import type { PlantConfig, ScenarioItem } from "./sim";
 import { Clock } from "./clock";
@@ -146,7 +149,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
       routes: [
         "GET /clock", "POST /clock/speed", "POST /clock/jump", "GET /assets", "GET /tags/latest", "GET /tags/{tag}/history",
         "GET /maintenance/log", "POST /maintenance/workorder", "GET /admin/ground_truth", "POST /admin/inject_fault",
-        "POST /admin/reset", "GET /admin/model_artifacts", "POST /admin/model_artifacts",
+        "POST /admin/reset", "GET /admin/model_artifacts", "POST /admin/model_artifacts", "GET /playbook", "POST /admin/playbook",
       ],
     });
   }
@@ -330,6 +333,32 @@ async function handle(req: Request, env: Env): Promise<Response> {
     await env.DB.prepare("INSERT OR REPLACE INTO model_artifacts(run_id, task, seed, uploaded_at, sim_time, body) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(b.run_id, task, b.seed, record.uploaded_at, record.sim_time, text).run();
     return json({ run_id: b.run_id, stored: "d1", bytes: text.length }, 201);
+  }
+
+  // ----- playbook (docs/playbook/<mode>.md, loaded by scripts/load_playbook.py) -----
+  if (path === "/admin/playbook" && method === "POST") {
+    requireAdmin(req, env);
+    const b = await body<{ mode?: string; sections?: Record<string, unknown> }>(req);
+    if (!b.mode || !(b.mode in FAULT_MODES)) throw new HttpError(422, `mode must be one of ${Object.keys(FAULT_MODES).sort().join(", ")}`);
+    const entries = Object.entries(b.sections ?? {});
+    const bad = entries.filter(([k, v]) => !PLAYBOOK_SECTIONS.includes(k) || typeof v !== "string" || !v.trim() || v.length > 8000);
+    if (!entries.length || bad.length) throw new HttpError(422, `sections: non-empty strings (<= 8000 chars) keyed by ${PLAYBOOK_SECTIONS.join(", ")}`);
+    const up = env.DB.prepare("INSERT OR REPLACE INTO playbook(mode, section, body) VALUES (?, ?, ?)");
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM playbook WHERE mode = ?").bind(b.mode),
+      ...entries.map(([k, v]) => up.bind(b.mode, k, (v as string).trim())),
+    ]);
+    return json({ mode: b.mode, sections: entries.map(([k]) => k) }, 201);
+  }
+  if (path === "/playbook" && method === "GET") {
+    requireRead(req, env);
+    const mode = url.searchParams.get("mode");
+    const rows = mode
+      ? await env.DB.prepare("SELECT mode, section, body FROM playbook WHERE mode = ?").bind(mode).all<{ mode: string; section: string; body: string }>()
+      : await env.DB.prepare("SELECT mode, section, body FROM playbook ORDER BY mode").all<{ mode: string; section: string; body: string }>();
+    const out: Record<string, Record<string, string>> = {};
+    for (const r of rows.results) (out[r.mode] ??= {})[r.section] = r.body;
+    return json(out);
   }
 
   const art = /^\/admin\/model_artifacts\/([^/]+)$/.exec(path);

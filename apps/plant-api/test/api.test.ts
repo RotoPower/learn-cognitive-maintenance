@@ -155,6 +155,21 @@ describe("admin", () => {
     expect((await post("/admin/inject_fault", { ...body, mode: "nope" }, ADMIN)).status).toBe(422);
   });
 
+  it("playbook: admin loads a mode's sections into D1, read token gets them back", async () => {
+    const book = { symptoms: "- VIB_DE rising", checks: "- spectrum", actions: "- re-grease\n- plan the change", spares: "- bearing set", lead_time: "4 to 5 weeks" };
+    expect((await post("/admin/playbook", { mode: "bearing_wear", sections: book }, READ)).status).toBe(403);
+    expect((await post("/admin/playbook", { mode: "nope", sections: book }, ADMIN)).status).toBe(422);
+    expect((await post("/admin/playbook", { mode: "bearing_wear", sections: { vibes: "x" } }, ADMIN)).status).toBe(422);
+    expect((await post("/admin/playbook", { mode: "bearing_wear", sections: book }, ADMIN)).status).toBe(201);
+    // reloading replaces the mode: a section dropped from the file disappears
+    const { spares: _dropped, ...fewer } = book;
+    expect((await post("/admin/playbook", { mode: "bearing_wear", sections: fewer }, ADMIN)).status).toBe(201);
+    const got = (await (await get("/playbook?mode=bearing_wear", READ)).json()) as Record<string, Record<string, string>>;
+    expect(Object.keys(got.bearing_wear).sort()).toEqual(["actions", "checks", "lead_time", "symptoms"]);
+    expect(got.bearing_wear.actions).toBe("- re-grease\n- plan the change");
+    expect((await get("/playbook")).status).toBe(401);
+  });
+
   it("model artefacts round-trip through D1", async () => {
     const art = { run_id: "colab-a", seed: 42, model: { coefficients: [0.5] }, metrics: { auc: 0.9 }, meta: { task: "predict" } };
     expect((await post("/admin/model_artifacts", art, ADMIN)).status).toBe(201);
