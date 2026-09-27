@@ -52,5 +52,10 @@ The plant API routes it uses: `/clock`, `/assets`, `/tags/latest`, `/tags/{tag}/
 `/alerts` and `/predictions` have rows only on the Cloudflare plant API (scoring runs there);
 the local FastAPI returns empty lists.
 
+**Hosting:** during demos from your PC through a Cloudflare Quick Tunnel,
+`uv run python scripts/run_assistant_tunnel.py` (see `deploy/pc/README.md`). If the plant
+database is unavailable (for example the D1 free-tier limit), the tools still return live
+readings and mark alerts, risk and work orders as unavailable instead of empty.
+
 Tests: `uv run pytest tests/test_assistant.py` (no Claude call). Evaluation against a running
 assistant: `scripts/eval_assistant.py` (golden set in `tests/golden/assistant.yaml`).

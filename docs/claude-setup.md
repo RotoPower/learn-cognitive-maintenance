@@ -57,7 +57,9 @@ Skills, subagents, hooks, `.mcp.json`, the golden set, tests and all code. Not: 
 ## Run-time assistant (Part E)
 
 `apps/assistant`: Claude Agent SDK, four tools over the plant API, never a built-in tool
-(details in its README). Numbers must come from tools because the operator acts on them: a
+(details in its README). It runs on your PC during demos, behind a Cloudflare Quick Tunnel
+(`scripts/run_assistant_tunnel.py`, `deploy/pc/README.md`): the Oracle VM of the module needs a
+payment method, and a subscription-powered chat belongs in sessions you present, not always on. Numbers must come from tools because the operator acts on them: a
 guessed vibration value or date is worse than "I don't have that". `scripts/eval_assistant.py`
 checks it against `tests/golden/assistant.yaml` (failure mode named, no invented number,
 playbook actions); run it after every prompt change.
@@ -77,7 +79,8 @@ for a minute. BFP2's scripted bearing wear starts at day 240; it fails on day 27
    **Run scoring now**. Around day 258 (2024-09-14) BFP2 turns red: the risk model alerts after
    two consecutive days above threshold (validated: first alert 2024-09-13, 14 days ahead).
    One more +7 and scoring shows the DE vibration anomaly alert (from 2024-09-16).
-3. **Chat panel**: "What happened to BFP-2 this week?" then "What should we do?". It cites
+3. **Chat panel** (start `uv run python scripts/run_assistant_tunnel.py` before the demo and wait
+   for READY): "What happened to BFP-2 this week?" then "What should we do?". It cites
    `BFP2.VIB_DE` and `BRG_TEMP_DE` with values, times and baselines, and the bearing-wear
    playbook actions.
 4. **Asset drawer -> Create work order**, review, **Confirm** (or ask the chat to draft one and

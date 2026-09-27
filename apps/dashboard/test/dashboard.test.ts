@@ -154,11 +154,16 @@ describe("assistant proxy", () => {
     expect((await post("/api/chat/confirm", { session_id: "sess-00000001", draft_id: "nope" })).status).toBe(404);
   });
 
-  it("503 until the assistant is connected; a wrong secret is the operator's problem (502)", async () => {
+  it("offline (503) when unset, unreachable or behind a stopped tunnel; a wrong secret is the operator's problem (502)", async () => {
     const { assistant } = await import("../src/index");
     const req = () => new Request("http://dash/api/chat", { method: "POST", body: JSON.stringify({ message: "hi", session_id: "sess-00000001" }) });
     const none = { ...env, ASSISTANT: undefined, ASSISTANT_URL: undefined } as never;
-    await expect(assistant(none, req(), "/chat")).rejects.toMatchObject({ status: 503 });
+    await expect(assistant(none, req(), "/chat")).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/offline/) });
+    // a stopped Quick Tunnel: Cloudflare's 530 error page, or no connection at all
+    const stale = { ...env, ASSISTANT: { fetch: async () => new Response("<html>1033</html>", { status: 530 }) } } as never;
+    await expect(assistant(stale, req(), "/chat")).rejects.toMatchObject({ status: 503, message: expect.stringMatching(/offline/) });
+    const down = { ...env, ASSISTANT: { fetch: async () => { throw new Error("connect refused"); } } } as never;
+    await expect(assistant(down, req(), "/chat")).rejects.toMatchObject({ status: 503 });
     const wrong = { ...env, ASSISTANT_SECRET: "nope" } as never;
     await expect(assistant(wrong, req(), "/chat")).rejects.toMatchObject({ status: 502 });
   });

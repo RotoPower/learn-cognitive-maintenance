@@ -307,8 +307,11 @@ export async function createWorkorder(env: Env, req: Request) {
 
 /** Forward to the assistant with the shared secret and the viewer's IP (for its per-viewer limit).
  *  The browser never sees the secret or the assistant's address. */
+const ASSISTANT_OFFLINE = "The assistant is offline: it runs during live demos. The rest of the dashboard works.";
+
 export async function assistant(env: Env, req: Request, path: "/chat" | "/workorders/confirm"): Promise<Response> {
-  if (!env.ASSISTANT && !env.ASSISTANT_URL) throw new HttpError(503, "the assistant is not connected yet (Part E); the rest of the dashboard works");
+  // The assistant runs on a PC behind a Quick Tunnel only during demos (deploy/pc/README.md).
+  if (!env.ASSISTANT && !env.ASSISTANT_URL) throw new HttpError(503, ASSISTANT_OFFLINE);
   const body = await req.text();
   if (body.length > 4000) throw new HttpError(413, "message too long");
   const init: RequestInit = {
@@ -326,10 +329,12 @@ export async function assistant(env: Env, req: Request, path: "/chat" | "/workor
   try {
     r = env.ASSISTANT ? await env.ASSISTANT.fetch(url, init) : await fetch(url, init);
   } catch {
-    throw new HttpError(502, "the assistant is not reachable right now");
+    throw new HttpError(503, ASSISTANT_OFFLINE);
   }
   if (!r.ok) {
     const detail = ((await r.json().catch(() => null)) as { detail?: string } | null)?.detail;
+    // A stopped Quick Tunnel answers with Cloudflare's own error page (e.g. 530), not our JSON.
+    if (r.status >= 500 && !detail) throw new HttpError(503, ASSISTANT_OFFLINE);
     // 401 means the Worker's secret is wrong: an operator problem, not the viewer's
     throw new HttpError(r.status === 401 ? 502 : r.status, r.status === 401 ? "the assistant rejected the dashboard (secret mismatch)" : detail ?? `assistant error ${r.status}`);
   }
