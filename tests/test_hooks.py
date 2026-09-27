@@ -119,3 +119,49 @@ def test_claude_cannot_create_approvals(repo, payload: dict) -> None:
 def test_other_tools_pass(repo) -> None:
     assert run({"tool_name": "Write", "tool_input": {"file_path": "apps/scoring/README.md"}}, repo[0])[0] == 0
     assert run({"tool_name": "Read", "tool_input": {"file_path": ".approvals/prod-x"}}, repo[0])[0] == 0
+
+
+# ------------------------------------------------ scripts/guard-ground-truth.sh (data, modeler)
+
+GT_HOOK = HOOK.parent / "guard-ground-truth.sh"
+
+
+def run_gt(payload: dict) -> int:
+    p = subprocess.run([BASH, str(GT_HOOK)], input=json.dumps(payload), capture_output=True, text=True, timeout=60)
+    return p.returncode
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"tool_name": "Read", "tool_input": {"file_path": "data/sim/ground_truth.json"}},
+        {"tool_name": "Read", "tool_input": {"file_path": "E:/x/plant/faults.yaml"}},
+        {"tool_name": "Read", "tool_input": {"file_path": "plant/faults_history_2023.yaml"}},
+        {"tool_name": "Grep", "tool_input": {"pattern": "onset_day"}},  # repo-wide: reads faults.yaml
+        {"tool_name": "Grep", "tool_input": {"pattern": "onset", "path": "plant"}},
+        {"tool_name": "Grep", "tool_input": {"pattern": "onset", "path": "plant", "glob": "*.yaml"}},
+        {"tool_name": "Glob", "tool_input": {"pattern": "**/ground_truth.json"}},
+        bash("cat plant/faults.yaml"),
+        bash("uv run plantctl --admin ground-truth"),
+        bash("uv run python -c \"from plant.sim import failures; print(failures())\""),
+        bash("Get-Content data/sim/ground_truth.json", tool="PowerShell"),
+    ],
+)
+def test_ground_truth_is_blocked(payload: dict) -> None:
+    assert run_gt(payload) == 2
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"tool_name": "Read", "tool_input": {"file_path": "data/sim/sensors.csv"}},
+        {"tool_name": "Read", "tool_input": {"file_path": "data/sim/maintenance_log.json"}},  # CMMS, operational
+        {"tool_name": "Read", "tool_input": {"file_path": "docs/plant.md"}},
+        {"tool_name": "Grep", "tool_input": {"pattern": "def build_features", "path": "models"}},
+        {"tool_name": "Grep", "tool_input": {"pattern": "rolling", "glob": "*.py"}},
+        bash("uv run plantctl history --tag BFP2.VIB_DE --from 2024-08-01 --to 2024-08-31"),
+        bash("uv run python -m models.anomaly score --as-of 2024-09-20T00:00:00"),
+    ],
+)
+def test_normal_data_work_passes(payload: dict) -> None:
+    assert run_gt(payload) == 0

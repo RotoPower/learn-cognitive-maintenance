@@ -121,3 +121,21 @@ def test_cli_end_to_end(tmp_path):
     assert json.loads((tmp_path / "a2" / "anomaly_fleet_2024-09-20_r1.json").read_text())["flags"] == \
         json.loads(art_path.read_text())["flags"]
     assert art["metrics"] == art2["metrics"]
+
+
+def test_episodes_merge_runs_less_than_a_day_apart():
+    """Same rule as the scoring Worker: one alert per episode, strongest peak kept."""
+    def f(tag, first, last, sev):
+        return {"asset": tag.split(".")[0], "tag": tag, "first_flag_ts": pd.Timestamp(first), "last_flag_ts": pd.Timestamp(last),
+                "hours_flagged": 6, "severity": sev, "z_peak_signed": sev, "z_at_end": 1.0, "interpretation": f"s{sev}"}
+    eps = A.episodes([
+        f("BFP2.VIB_DE", "2024-09-15T00", "2024-09-15T06", 4.0),
+        f("BFP2.VIB_DE", "2024-09-15T20", "2024-09-16T02", 6.0),
+        f("BFP2.VIB_DE", "2024-09-18T00", "2024-09-18T06", 3.5),
+        f("BFP2.BRG_TEMP_DE", "2024-09-15T01", "2024-09-15T07", 3.2),
+    ])
+    assert [(e["tag"], e["n_runs"], e["hours_flagged"], e["severity"], e["interpretation"]) for e in eps] == [
+        ("BFP2.BRG_TEMP_DE", 1, 6, 3.2, "s3.2"),
+        ("BFP2.VIB_DE", 2, 12, 6.0, "s6.0"),
+        ("BFP2.VIB_DE", 1, 6, 3.5, "s3.5"),
+    ]

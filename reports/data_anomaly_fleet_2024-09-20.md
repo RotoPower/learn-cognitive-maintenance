@@ -48,7 +48,9 @@ Sidecar: `data/derived/anomaly_fleet_2024-09-20.meta.json`
 2. **Dead tag** `GT1.BRG_TEMP_2`: constant 81.400 for the entire window (and, per docs/plant.md, the whole horizon). Not dropped — flagged via boolean `dead` column in the parquet and listed in the sidecar `dead_tags`. Modelers should exclude it from features.
 3. **Duplicated timestamp** (from full-series scan): 2024-03-28T14:00:00 appears twice in the raw CSV with identical values — outside our 07-01..09-20 window but deduplicated (kept first) across the whole file before windowing, so it cannot leak in if lookback is extended.
 4. **Missing-hours gap** (from full-series scan): 2024-05-11T00:00 to 2024-05-11T04:00 (5 hourly rows absent) — outside our extraction window, no impact here, but noted for anyone extending the lookback further back.
-5. **BFP2 vibration/bearing-temp elevation**: BFP2.VIB_DE and BFP2.BRG_TEMP_DE show above-baseline max values (3.05 mm/s, 71.1 degC vs baseline ~1.8/62). This lines up with the documented `bearing_wear` scenario onset at day 240 (2024-08-28) in `plant/faults.yaml`, i.e. genuine degrading-asset signal within the extraction window, not a data-quality defect. This is exactly the kind of anomaly the fleet run should be sensitive to on BFP2; do not treat as noise to clean out.
+5. **BFP2 vibration/bearing-temp elevation**: BFP2.VIB_DE and BFP2.BRG_TEMP_DE show above-baseline max values (3.05 mm/s, 71.1 degC vs baseline ~1.8/62). Both tags rise together, gradually, while BFP1 under the same plant load stays flat, which matches the drive-end bearing-wear symptom pattern in the maintenance-domain skill: a process signal, not a data-quality defect. This is exactly the kind of anomaly the fleet run should be sensitive to on BFP2; do not treat as noise to clean out.
+
+   *Revised 2026-09-27 at the validator's request:* the first version dated this rise from the scenario script's onset. The fault scripts (`plant/faults*.yaml`) are ground truth and are now blocked for the data and modeler agents (`scripts/guard-ground-truth.sh`); a data report describes what the readings show, not what the script says.
 
 ## Notes for the modeler
 

@@ -194,6 +194,25 @@ def interpret(asset: str, tag: str, z_signed: float) -> str:
     return f"{short} {direction}: direction opposite to {modes[0][0]} symptom; no documented mode matches"
 
 
+def episodes(flags: list[dict], gap_hours: int = 24) -> list[dict]:
+    """Roll runs of the same tag that are less than ``gap_hours`` apart into one episode
+    (one alert to act on, not five). Keeps the strongest peak; hours add up. Same rule as
+    the scoring Worker (apps/scoring/src/score.ts, episodes)."""
+    out: list[dict] = []
+    for f in sorted(flags, key=lambda f: (f["tag"], f["first_flag_ts"])):
+        prev = out[-1] if out else None
+        if prev and prev["tag"] == f["tag"] and pd.Timestamp(f["first_flag_ts"]) - pd.Timestamp(prev["last_flag_ts"]) < pd.Timedelta(hours=gap_hours):
+            prev["last_flag_ts"] = f["last_flag_ts"]
+            prev["hours_flagged"] += f["hours_flagged"]
+            prev["n_runs"] += 1
+            prev["z_at_end"] = f["z_at_end"]
+            if f["severity"] > prev["severity"]:
+                prev.update(severity=f["severity"], z_peak_signed=f["z_peak_signed"], interpretation=f["interpretation"])
+        else:
+            out.append({**f, "n_runs": 1})
+    return out
+
+
 def asset_rollup(flags: list[dict]) -> dict[str, dict]:
     out: dict[str, dict] = {}
     by_asset: dict[str, list[dict]] = {}
@@ -231,7 +250,7 @@ def _ts(t) -> str:
     return pd.Timestamp(t).strftime("%Y-%m-%dT%H:%M")
 
 
-def write_report(path: Path, flags, rollup, cfg: Config, info: dict) -> None:
+def write_report(path: Path, flags, rollup, cfg: Config, info: dict, eps: list[dict] | None = None) -> None:
     lines = [
         f"# Anomaly report - fleet - as of {info['as_of']}",
         "",
@@ -254,6 +273,16 @@ def write_report(path: Path, flags, rollup, cfg: Config, info: dict) -> None:
             )
     else:
         lines.append("No flags in the scoring window.")
+    if eps is not None:
+        lines += ["", "## Episodes (runs of one tag less than 24 h apart, merged)", ""]
+        if eps:
+            lines.append("| asset | tag | first_flag_ts | last_flag_ts | runs | hours_flagged | severity |")
+            lines.append("|---|---|---|---|---|---|---|")
+            for e in eps:
+                sign = "+" if e["z_peak_signed"] > 0 else "-"
+                lines.append(f"| {e['asset']} | {e['tag']} | {_ts(e['first_flag_ts'])} | {_ts(e['last_flag_ts'])} | {e['n_runs']} | {e['hours_flagged']} | {e['severity']:.2f} ({sign}) |")
+        else:
+            lines.append("None.")
     lines += ["", "## Per-asset summary", ""]
     for asset in cfg.target_assets:
         r = rollup.get(asset)
@@ -282,6 +311,17 @@ def write_report(path: Path, flags, rollup, cfg: Config, info: dict) -> None:
         "even if before the window.",
         f"- Input: `{info['input']}` with sidecar `{info['sidecar']}`.",
         f"- Run id `{info['run_id']}`, seed {info['seed']}. No ground truth was read.",
+        "",
+        "## Limitations",
+        "",
+        "- **Load coupling.** Every asset's readings move with plant load (docs/plant.md) and the z-scores are "
+        "not load-normalised. A sustained load change can push a tag past the threshold on a healthy machine, and a "
+        "low-load week can hide a real rise. Check PLANT.LOAD over the same hours before acting on a flag.",
+        "- **Baseline self-poisoning.** The baseline is the trailing 30 days, so a slow fault feeds its own "
+        "degradation into the mean and std it is compared with. The reported z understates the drift (against a "
+        "baseline frozen before onset it is about twice as large), and a fault that develops over several weeks, "
+        "such as compressor fouling, can stay under the threshold entirely. Slow drifts are the predict model's "
+        "job (7-day slopes; it flags GT1 fouling 24 to 27 days ahead), not this detector's.",
         "",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -323,6 +363,7 @@ def run_score(
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     flags, stats = score_table(df, meta, as_of_ts, cfg)
     rollup = asset_rollup(flags)
+    eps = episodes(flags)
     run_id = f"anomaly_fleet_{date}_r{round_no}"
     info = {
         "run_id": run_id,
@@ -335,7 +376,7 @@ def run_score(
         "outage_windows": meta.get("outage_windows", []),
     }
     report_path = report_dir / f"anomaly_{date}.md"
-    write_report(report_path, flags, rollup, cfg, info)
+    write_report(report_path, flags, rollup, cfg, info, eps)
     artefact = {
         "run_id": run_id,
         "task": "anomaly",
@@ -351,10 +392,12 @@ def run_score(
             "outage_windows": info["outage_windows"],
         },
         "flags": flags,
+        "episodes": eps,
         "per_asset": rollup,
         "per_tag_stats": stats,
         "metrics": {
             "n_flags": len(flags),
+            "n_episodes": len(eps),
             "n_assets_flagged": len({f["asset"] for f in flags}),
             "n_tags_flagged": len({f["tag"] for f in flags}),
             "n_tags_scored": len(stats),
