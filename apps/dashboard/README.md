@@ -64,3 +64,9 @@ npm run deploy:staging
 `npm test` covers the API (fake plant and scoring bindings): KPIs as of sim time, future
 alerts hidden, draft/confirm work orders, forward-only jumps, per-viewer and daily caps,
 hashed viewer ids, and that no response ever contains a token.
+
+## Deploys
+
+Staging deploys on every push to `main` that touches this app (Workers Builds: tests, then
+`npx wrangler deploy --env staging`); production only from a `v*` tag after approval. See
+[docs/ci-cd.md](../../docs/ci-cd.md). D1 migrations are applied separately.

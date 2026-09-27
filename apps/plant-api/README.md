@@ -42,3 +42,9 @@ Then `PLANT_API_URL=https://plant-api-staging.<account>.workers.dev uv run plant
   `src/faults.ts`.
 - **Environments**: `[env.staging]` and `[env.production]` have separate D1
   databases and DO namespaces. Production deploys only via git tag through CI (D2.6).
+
+## Deploys
+
+Staging deploys on every push to `main` that touches this app (Workers Builds: tests, then
+`npx wrangler deploy --env staging`); production only from a `v*` tag after approval. See
+[docs/ci-cd.md](../../docs/ci-cd.md). D1 migrations are applied separately.

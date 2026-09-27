@@ -55,3 +55,9 @@ npm run deploy:staging
 
 Check with `curl -X POST -H "Authorization: Bearer $ADMIN" https://plant-scoring-staging.rotopower.workers.dev/score`
 and `GET /health`.
+
+## Deploys
+
+Staging deploys on every push to `main` that touches this app (Workers Builds: tests, then
+`npx wrangler deploy --env staging`); production only from a `v*` tag after approval. See
+[docs/ci-cd.md](../../docs/ci-cd.md). D1 migrations are applied separately.

@@ -63,3 +63,9 @@ the `ix_readings_ts` index write too (x2):
 Keep staging at speed <= 60. A demo "Jump +7 days" backfills at most
 `MAX_BACKFILL_HOURS` (168 h, ~8k writes). When the clock is paused or clamped at the
 horizon end, the current hour is already stored and a pass writes nothing.
+
+## Deploys
+
+Staging deploys on every push to `main` that touches this app (Workers Builds: tests, then
+`npx wrangler deploy --env staging`); production only from a `v*` tag after approval. See
+[docs/ci-cd.md](../../docs/ci-cd.md). D1 migrations are applied separately.
