@@ -80,10 +80,13 @@ def art(table: pd.DataFrame) -> dict:
 def test_feature_columns_and_exclusions(feats: pd.DataFrame) -> None:
     cols = F.feature_columns(feats)
     assert {"VIB_DE__cur", "VIB_DE__mean7d", "VIB_DE__slope7d", "VIB_DE__slope30d", "hours_since_repair", "LOAD__cur"} <= set(cols)
-    assert not any(c.startswith("BRG_TEMP_2") for c in cols), "dead tag must be excluded"
+    # GT1.BRG_TEMP_2 is dead and excluded; GT2 has a working BRG_TEMP_2, so the shared column exists
+    gt1_brg2 = feats.loc[feats["asset"] == "GT1", "BRG_TEMP_2__cur"]
+    assert gt1_brg2.isna().all(), "dead tag must be excluded"
+    assert feats.loc[feats["asset"] == "GT2", "BRG_TEMP_2__cur"].notna().any()
     assert not any(c.startswith("LOAD__slope") for c in cols)
     assert not any(c.startswith("PLANT") for c in cols)
-    assert set(feats["asset"]) == {"GT1", "BFP1", "BFP2", "CTF1"}
+    assert {"GT1", "BFP1", "BFP2", "CTF1"} <= set(feats["asset"]) and len(set(feats["asset"])) == 14
     assert set(feats.columns) & {"label", "health", "failure", "rul"} == set()
     # one row per asset per day
     assert feats.groupby("asset").size().nunique() == 1
@@ -159,7 +162,7 @@ def test_labels_window_and_unknown() -> None:
 def test_labels_output_has_no_ground_truth_columns(table: pd.DataFrame) -> None:
     assert "label" in table.columns
     assert set(table.columns) & {"failure", "failure_est", "mode", "health", "onset"} == set()
-    assert table["label"].isna().sum() == 4 * H  # the last H days per asset are unknowable
+    assert table["label"].isna().sum() == table["asset"].nunique() * H  # the last H days per asset are unknowable
 
 
 def test_labels_cli(tmp_path: Path, feats: pd.DataFrame, plant: Plant, capsys) -> None:

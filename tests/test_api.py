@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from plant.api import SimClock, create_app
-from plant.sim import Plant
+from plant.sim import TAGS, Plant
 
 READ = {"Authorization": "Bearer r"}
 ADMIN = {"Authorization": "Bearer a"}
@@ -123,7 +123,8 @@ def test_x_api_key_header_works(env) -> None:
 def test_assets(env) -> None:
     c, _, _ = env
     body = c.get("/assets", headers=READ).json()
-    assert [a["asset_id"] for a in body] == ["GT1", "BFP1", "BFP2", "CTF1"]
+    assert [a["asset_id"] for a in body] == list(TAGS)  # the original four first, then the full plant
+    assert [a["asset_id"] for a in body][:4] == ["GT1", "BFP1", "BFP2", "CTF1"]
     assert "GT1.EXH_TEMP" in body[0]["tags"]
 
 
@@ -175,7 +176,7 @@ def test_latest(env) -> None:
     plant = Plant.from_yaml(seed=42)
     assert body["values"]["BFP2.FLOW"] == pytest.approx(plant.value("BFP2", "FLOW", datetime(2024, 9, 1, 1)))
     all_tags = c.get("/tags/latest", headers=READ).json()["values"]
-    assert len(all_tags) == 1 + 7 + 6 + 6 + 4
+    assert len(all_tags) == 1 + sum(len(t) for t in TAGS.values()) == 82
     assert c.get("/tags/latest", params={"asset_id": "NOPE"}, headers=READ).status_code == 404
 
 

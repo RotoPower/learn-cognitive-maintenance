@@ -255,3 +255,52 @@ def test_write_outputs(plant: Plant, tmp_path) -> None:
     assert paths["sensors"].exists() and paths["ground_truth"].exists()
     text = paths["ground_truth"].read_text()
     assert "gearbox_wear" in text and "CTF1" in text
+
+
+# --------------------------------------------------------------------------- #
+# Full plant: every new mode on the assets it applies to
+# --------------------------------------------------------------------------- #
+
+FULL_CFG = {
+    "seed": 11,
+    "start": "2024-01-01",
+    "horizon_days": 200,
+    "scenarios": [
+        {"asset": a, "mode": m, "onset_day": 40, "duration_days": 30}
+        for a, m in [("HRSG1", "tube_leak"), ("CWP1", "seal_leak"), ("ST1", "blade_erosion"), ("GEN1", "winding_overheat"),
+                     ("TX1", "oil_degradation"), ("GT2", "compressor_fouling"), ("BFP3", "bearing_wear"), ("CWP2", "bearing_wear"),
+                     ("CTF2", "gearbox_wear")]
+    ],
+}
+
+
+@pytest.fixture(scope="module")
+def full_plant() -> Plant:
+    return Plant.from_config(FULL_CFG)
+
+
+@pytest.mark.parametrize("asset,mode", [(s["asset"], s["mode"]) for s in FULL_CFG["scenarios"]])
+def test_new_modes_move_in_scripted_direction(full_plant: Plant, asset: str, mode: str) -> None:
+    test_symptoms_move_in_scripted_direction(full_plant, asset, mode)
+
+
+def test_modes_only_on_the_assets_they_apply_to() -> None:
+    assert sim.MODE_ASSETS["seal_leak"] == ("CWP1", "CWP2")
+    for asset, mode in [("BFP1", "seal_leak"), ("GT1", "tube_leak"), ("TX1", "bearing_wear"), ("ST1", "compressor_fouling")]:
+        cfg = {"seed": 1, "start": "2024-01-01", "horizon_days": 30,
+               "scenarios": [{"asset": asset, "mode": mode, "onset_day": 1, "duration_days": 5}]}
+        with pytest.raises(ValueError, match="does not apply"):
+            Plant.from_config(cfg)
+    # every symptom tag exists on every asset its mode applies to
+    for mode, assets in sim.MODE_ASSETS.items():
+        for a in assets:
+            assert set(FAULT_MODES[mode]) <= set(TAGS[a]), (mode, a)
+
+
+def test_full_plant_shape_and_healthy_assets_at_baseline(full_plant: Plant) -> None:
+    assert len(TAGS) == 14 and 1 + sum(len(t) for t in TAGS.values()) == 82
+    assert not TAGS["GT2"]["BRG_TEMP_2"].dead  # only GT1's transmitter is dead
+    # an asset with no scenario sits at baseline once the load effect is removed
+    hours = np.arange(10 * H, 30 * H, 1.0)
+    for tag, spec in TAGS["HRSG2"].items():
+        assert abs(_mean(full_plant, "HRSG2", tag, hours) - spec.baseline) < 4 * spec.noise / math.sqrt(len(hours)) + 1e-9, tag

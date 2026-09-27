@@ -55,23 +55,77 @@ _PUMP_TAGS = {
     "MOTOR_CURR": TagSpec(310.0, 180.0, 2.0),
 }
 
+_GT_TAGS = {
+    "LOAD_MW": TagSpec(90.0, 120.0, 0.8),
+    "EXH_TEMP": TagSpec(540.0, 60.0, 2.0),
+    "CDP": TagSpec(15.5, 5.0, 0.08),
+    "FUEL_FLOW": TagSpec(6.2, 5.5, 0.05),
+    "VIB_1": TagSpec(2.1, 0.4, 0.12),
+    "BRG_TEMP_1": TagSpec(78.0, 6.0, 0.6),
+}
+
+_CTF_TAGS = {
+    "SPEED": TagSpec(118.0, 0.0, 0.3),
+    "VIB": TagSpec(2.4, 0.3, 0.15),
+    "GBX_OIL_TEMP": TagSpec(58.0, 9.0, 0.6),
+    "MOTOR_CURR": TagSpec(95.0, 25.0, 1.0),
+}
+
+_HRSG_TAGS = {
+    "STEAM_FLOW": TagSpec(150.0, 140.0, 1.5),
+    "FW_FLOW": TagSpec(152.0, 140.0, 1.5),
+    "DRUM_PRESS": TagSpec(95.0, 20.0, 0.4),
+    "STACK_TEMP": TagSpec(95.0, 12.0, 0.8),
+    "MAKEUP_FLOW": TagSpec(2.0, 0.5, 0.15),
+}
+
+_CWP_TAGS = {
+    "FLOW": TagSpec(9000.0, 500.0, 40.0),
+    "DISCH_PRESS": TagSpec(2.5, 0.2, 0.02),
+    "VIB_DE": TagSpec(2.0, 0.2, 0.10),
+    "VIB_NDE": TagSpec(1.7, 0.2, 0.10),
+    "BRG_TEMP_DE": TagSpec(55.0, 3.0, 0.5),
+    "MOTOR_CURR": TagSpec(180.0, 20.0, 1.5),
+    "SEAL_LEAK_FLOW": TagSpec(2.0, 0.2, 0.2),
+}
+
+# The original four assets come first and never change: readings are hashed per
+# (seed, asset, tag, hour), so adding assets leaves every existing value as it was.
 TAGS: dict[str, dict[str, TagSpec]] = {
-    "GT1": {
-        "LOAD_MW": TagSpec(90.0, 120.0, 0.8),
-        "EXH_TEMP": TagSpec(540.0, 60.0, 2.0),
-        "CDP": TagSpec(15.5, 5.0, 0.08),
-        "FUEL_FLOW": TagSpec(6.2, 5.5, 0.05),
-        "VIB_1": TagSpec(2.1, 0.4, 0.12),
-        "BRG_TEMP_1": TagSpec(78.0, 6.0, 0.6),
-        "BRG_TEMP_2": TagSpec(81.4, 0.0, 0.0, dead=True),
-    },
+    "GT1": {**_GT_TAGS, "BRG_TEMP_2": TagSpec(81.4, 0.0, 0.0, dead=True)},
     "BFP1": dict(_PUMP_TAGS),
     "BFP2": dict(_PUMP_TAGS),
-    "CTF1": {
-        "SPEED": TagSpec(118.0, 0.0, 0.3),
-        "VIB": TagSpec(2.4, 0.3, 0.15),
-        "GBX_OIL_TEMP": TagSpec(58.0, 9.0, 0.6),
-        "MOTOR_CURR": TagSpec(95.0, 25.0, 1.0),
+    "CTF1": dict(_CTF_TAGS),
+    # full plant (docs/design/full-plant.md)
+    "GT2": {**_GT_TAGS, "BRG_TEMP_2": TagSpec(80.0, 6.0, 0.6)},
+    "HRSG1": dict(_HRSG_TAGS),
+    "HRSG2": dict(_HRSG_TAGS),
+    "ST1": {
+        "LOAD_MW": TagSpec(55.0, 70.0, 0.6),
+        "INLET_PRESS": TagSpec(90.0, 18.0, 0.4),
+        "INLET_TEMP": TagSpec(540.0, 10.0, 1.5),
+        "STAGE_PRESS": TagSpec(60.0, 14.0, 0.3),
+        "EXH_PRESS": TagSpec(8.0, 2.0, 0.08),
+        "VIB_1": TagSpec(1.9, 0.3, 0.10),
+        "BRG_TEMP_1": TagSpec(75.0, 5.0, 0.5),
+    },
+    "BFP3": dict(_PUMP_TAGS),
+    "CWP1": dict(_CWP_TAGS),
+    "CWP2": dict(_CWP_TAGS),
+    "CTF2": dict(_CTF_TAGS),
+    "GEN1": {
+        "MW": TagSpec(140.0, 190.0, 1.0),
+        "STATOR_TEMP_1": TagSpec(95.0, 25.0, 0.8),
+        "STATOR_TEMP_2": TagSpec(96.0, 25.0, 0.8),
+        "COOLANT_TEMP": TagSpec(40.0, 6.0, 0.4),
+        "PD_ACTIVITY": TagSpec(150.0, 30.0, 15.0),
+    },
+    "TX1": {
+        "LOAD_MVA": TagSpec(150.0, 200.0, 1.5),
+        "TOP_OIL_TEMP": TagSpec(60.0, 25.0, 0.6),
+        "WINDING_TEMP": TagSpec(75.0, 35.0, 0.8),
+        "H2_PPM": TagSpec(30.0, 0.0, 1.5),
+        "MOISTURE_PPM": TagSpec(10.0, 0.0, 0.5),
     },
 }
 ASSETS: tuple[str, ...] = tuple(TAGS)
@@ -95,6 +149,45 @@ FAULT_MODES: dict[str, dict[str, tuple[float, float]]] = {
         "VIB": (3.5, 2.0),
         "MOTOR_CURR": (7.0, 1.0),
     },
+    "tube_leak": {
+        "MAKEUP_FLOW": (6.0, 1.5),
+        "FW_FLOW": (6.0, 1.5),
+        "STACK_TEMP": (-8.0, 1.5),
+        "DRUM_PRESS": (-2.0, 1.0),
+    },
+    "seal_leak": {
+        "SEAL_LEAK_FLOW": (25.0, 1.5),
+        "DISCH_PRESS": (-0.15, 1.0),
+        "FLOW": (-200.0, 1.0),
+    },
+    "blade_erosion": {
+        "LOAD_MW": (-3.0, 1.0),
+        "STAGE_PRESS": (2.5, 1.0),
+        "VIB_1": (1.5, 2.0),
+    },
+    "winding_overheat": {
+        "STATOR_TEMP_1": (18.0, 1.5),
+        "STATOR_TEMP_2": (14.0, 1.5),
+        "PD_ACTIVITY": (600.0, 2.0),
+        "COOLANT_TEMP": (2.0, 1.0),
+    },
+    "oil_degradation": {
+        "H2_PPM": (220.0, 1.5),
+        "MOISTURE_PPM": (25.0, 1.0),
+        "TOP_OIL_TEMP": (4.0, 1.0),
+    },
+}
+
+# Which assets each failure mode can happen on (a scenario elsewhere is rejected).
+MODE_ASSETS: dict[str, tuple[str, ...]] = {
+    "bearing_wear": ("BFP1", "BFP2", "BFP3", "CWP1", "CWP2"),
+    "compressor_fouling": ("GT1", "GT2"),
+    "gearbox_wear": ("CTF1", "CTF2"),
+    "tube_leak": ("HRSG1", "HRSG2"),
+    "seal_leak": ("CWP1", "CWP2"),
+    "blade_erosion": ("ST1",),
+    "winding_overheat": ("GEN1",),
+    "oil_degradation": ("TX1",),
 }
 
 HEALTH_SHAPE = 2.5  # health = 1 - x ** HEALTH_SHAPE, accelerating degradation
@@ -196,6 +289,8 @@ class Plant:
         for s in self.scenarios:
             if s.mode not in FAULT_MODES:
                 raise ValueError(f"unknown fault mode {s.mode!r}")
+            if s.asset not in MODE_ASSETS[s.mode]:
+                raise ValueError(f"{s.mode} does not apply to {s.asset}; it applies to {', '.join(MODE_ASSETS[s.mode])}")
         self._by_asset: dict[str, tuple[Scenario, ...]] = {
             a: tuple(s for s in self.scenarios if s.asset == a) for a in ASSETS
         }
