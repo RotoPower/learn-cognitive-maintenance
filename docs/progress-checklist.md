@@ -67,7 +67,7 @@ Legend: `[x]` done and verified · `[~]` partly done · `[ ]` not started · **?
 - [ ] D2.5 / D3 public dashboard (`apps/dashboard/`)
 - [ ] D2.6 Workers Builds CI/CD
 - [x] D2.7 `deployer` agent + `scripts/block-prod-deploy.sh` hook: `.claude/agents/deployer.md` (module frontmatter; Cloudflare MCP via `cmd /c npx` on Windows; staging steps, D1-budget rules, health-first). Hook installed project-wide on `Bash|PowerShell|Write|Edit` and in the deployer's frontmatter: blocks any Cloudflare-changing wrangler/npm command that does not target `--env staging` (bare `wrangler deploy` counts as production: the top-level Worker names are the production ones), unless `.approvals/prod-<sha>` matches HEAD in the main checkout; blocks Claude from creating approvals; `--dry-run`, `tail`, `--local` D1 pass. `tests/test_hooks.py` (36 cases, incl. commit messages that only mention approvals). Verified live: Bash and PowerShell production commands and approval creation blocked, staging passes. `/run` step 5 now calls the deployer. `.approvals/` gitignored. Note: `guard-raw-data.sh` still matches only `Bash|Write|Edit`, not the PowerShell tool
-- [ ] D2.8 `claude mcp add` for Claude Code docs and Cloudflare (only Slack, Drive, Canva connectors present)
+- [~] D2.8 connectors: `claude-code-docs` (HTTP, https://code.claude.com/docs/mcp) added at **project scope** in `.mcp.json`, so a fresh clone gets it; endpoint answers MCP `initialize` ("Claude Code Docs"). Pending your approval on the next `claude` start (or `/mcp`). Cloudflare MCP only on the `deployer` agent (D2.7), untested until first use
 - [ ] Checkpoint D
 
 ## Part E — Assistant
