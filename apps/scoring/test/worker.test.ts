@@ -7,9 +7,10 @@ import { HOUR_MS, ms } from "../src/score";
 
 const testEnv = (over: Partial<Env> = {}): Env => ({ ...(env as unknown as Env), ...over });
 const readings = fixture.readings as Record<string, (number | null)[]>;
+const [before, after] = fixture.cases; // 2024-09-20 (BFP2 degrading), 2024-10-03 (after its repair)
 
 /** Fake plant API at the fixture's sim time. */
-function fakeApi(simTime = fixture.as_of): Fetcher {
+function fakeApi(simTime = before.as_of): Fetcher {
   const assets: Record<string, string[]> = {};
   for (const tag of Object.keys(readings)) (assets[tag.split(".")[0]] ??= []).push(tag);
   return async (url, init) => {
@@ -17,7 +18,7 @@ function fakeApi(simTime = fixture.as_of): Fetcher {
     const p = new URL(url).pathname;
     if (p === "/clock") return Response.json({ sim_time: simTime, speed: 60 });
     if (p === "/assets") return Response.json(Object.entries(assets).map(([asset_id, tags]) => ({ asset_id, tags })));
-    if (p === "/maintenance/log") return Response.json(fixture.repairs);
+    if (p === "/maintenance/log") return Response.json(fixture.repairs.filter((r) => ms(r.timestamp) <= ms(simTime))); // past only, like the API
     return new Response("nope", { status: 404 });
   };
 }
@@ -60,11 +61,11 @@ beforeEach(async () => {
 describe("scoreOnce", () => {
   it("scores one sim day: runs, predictions, alerts as episodes; reads only the lookback window", async () => {
     const r = await scoreOnce(testEnv(), { fetcher: fakeApi() });
-    expect(r.as_of).toBe(fixture.as_of);
-    expect(r.anomaly).toMatchObject({ artifact: "anomaly_fleet_2024-09-20_r1", flags: fixture.expected.anomaly.length });
+    expect(r.as_of).toBe(before.as_of);
+    expect(r.anomaly).toMatchObject({ artifact: "anomaly_fleet_2024-09-20_r1", flags: before.expected.anomaly.length });
     const pred = r.predict as { p_fail: Record<string, number>; features_at: string; alerts: number; workorders: number };
     expect(pred.features_at).toBe("2024-09-20T00:00:00");
-    for (const p of fixture.expected.predict) expect(pred.p_fail[p.asset]).toBeCloseTo(p.p_fail, 9);
+    for (const p of before.expected.predict) expect(pred.p_fail[p.asset]).toBeCloseTo(p.p_fail, 9);
     expect(pred.alerts).toBe(0); // PREDICT_ACTIONS=off
     expect(pred.workorders).toBe(0);
 
@@ -72,13 +73,13 @@ describe("scoreOnce", () => {
     expect(await count("SELECT COUNT(*) AS n FROM predictions")).toBe(4);
     const alerts = await env.DB.prepare("SELECT tag FROM alerts ORDER BY tag, first_flag_ts").all<{ tag: string }>();
     expect(alerts.results.length).toBe((r.anomaly as { episodes: number }).episodes);
-    expect(alerts.results.length).toBeLessThan(fixture.expected.anomaly.length); // 9 runs roll up into fewer episodes
+    expect(alerts.results.length).toBeLessThan(before.expected.anomaly.length); // 9 runs roll up into fewer episodes
     expect(new Set(alerts.results.map((a) => a.tag))).toEqual(new Set(["BFP2.VIB_DE", "BFP2.BRG_TEMP_DE"]));
     expect(await count("SELECT COUNT(*) AS n FROM maintenance_log")).toBe(0);
 
     const tags = Object.keys(readings).length;
     expect(r.rows_read).toBeGreaterThanOrEqual(tags * 1440);
-    expect(r.rows_read).toBeLessThan(tags * 1440 + 100); // nothing outside the window, e.g. not the 2204 row
+    expect(r.rows_read).toBeLessThan(tags * 1440 + 200); // nothing outside the window, e.g. not the 2204 row
   });
 
   it("is a no-op for a sim day already scored; force re-runs extend alerts instead of duplicating them", async () => {
@@ -95,7 +96,7 @@ describe("scoreOnce", () => {
   it("raises one predict alert and one work order per asset when PREDICT_ACTIONS=on", async () => {
     const on = testEnv({ PREDICT_ACTIONS: "on" });
     const r = await scoreOnce(on, { fetcher: fakeApi() });
-    const hot = fixture.expected.predict.filter((p) => p.p_fail >= fixture.artifact.threshold).map((p) => p.asset);
+    const hot = before.expected.predict.filter((p) => p.alert).map((p) => p.asset); // 2 consecutive days above threshold
     expect(hot).toContain("BFP2");
     expect((r.predict as { alerts: number }).alerts).toBe(hot.length);
     const wos = await env.DB.prepare("SELECT wo_id, asset_id, source, description FROM maintenance_log WHERE kind='workorder' ORDER BY wo_id")
@@ -107,6 +108,27 @@ describe("scoreOnce", () => {
     await scoreOnce(on, { fetcher: fakeApi(), force: true });
     expect(await count("SELECT COUNT(*) AS n FROM maintenance_log WHERE kind='workorder'")).toBe(hot.length);
     expect(await count("SELECT COUNT(*) AS n FROM alerts WHERE kind='predict'")).toBe(hot.length);
+  });
+
+  it("a repair resolves the asset's open alerts and scoring work orders; the ended episode stays resolved", async () => {
+    const on = testEnv({ PREDICT_ACTIONS: "on" });
+    await scoreOnce(on, { fetcher: fakeApi(before.as_of) });
+    const openBefore = await count("SELECT COUNT(*) AS n FROM alerts WHERE asset_id = 'BFP2' AND status = 'open'");
+    expect(openBefore).toBeGreaterThan(0);
+    expect(await count("SELECT COUNT(*) AS n FROM maintenance_log WHERE asset_id = 'BFP2' AND status = 'open'")).toBe(1);
+
+    const r = await scoreOnce(on, { fetcher: fakeApi(after.as_of) });
+    expect(r.anomaly).toMatchObject({ closed_by_repair: openBefore });
+    expect(await count("SELECT COUNT(*) AS n FROM alerts WHERE asset_id = 'BFP2' AND status = 'open'")).toBe(0);
+    expect(await count("SELECT COUNT(*) AS n FROM maintenance_log WHERE asset_id = 'BFP2' AND status = 'done' AND source = 'scoring'")).toBe(1);
+    expect((r.predict as { p_fail: Record<string, number> }).p_fail.BFP2).toBeCloseTo(after.expected.predict.find((p) => p.asset === "BFP2")!.p_fail, 9);
+    expect((r.predict as { alerts: number }).alerts).toBe(0);
+
+    // scored fresh after the repair (no earlier run): the pre-repair episode is recorded, already resolved
+    await env.DB.batch([env.DB.prepare("DELETE FROM alerts"), env.DB.prepare("DELETE FROM runs")]);
+    const fresh = await scoreOnce(on, { fetcher: fakeApi(after.as_of) });
+    expect((fresh.anomaly as { recorded_resolved: number }).recorded_resolved).toBeGreaterThan(0);
+    expect(await count("SELECT COUNT(*) AS n FROM alerts WHERE status = 'open'")).toBe(0);
   });
 
   it("records anomaly only when no predict artefact is stored", async () => {

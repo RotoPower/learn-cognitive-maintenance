@@ -13,7 +13,7 @@ run_worker_first = ["/api/*"]
 [vars]
 PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
 SCORING_URL = "http://127.0.0.1:8789"         # wrangler dev of apps/scoring
-PREDICT_TRUSTED = "off"                       # predict is NO-GO: risk is shown, but does not colour status
+PREDICT_TRUSTED = "on"                        # validator GO (2026-09-27): risk sets status too
 CACHE_SECONDS = "30"
 DEMO_PER_VIEWER_HOUR = "5"
 DEMO_GLOBAL_HOUR = "60"
@@ -37,7 +37,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 # ---------------------------------------------------------------- staging
 [env.staging]
 name = "plant-dashboard-staging"
-vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", SCORING_URL = "https://plant-scoring-staging.rotopower.workers.dev", PREDICT_TRUSTED = "off", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "5", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", WORKORDER_PER_VIEWER_HOUR = "10" }
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", SCORING_URL = "https://plant-scoring-staging.rotopower.workers.dev", PREDICT_TRUSTED = "on", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "5", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", WORKORDER_PER_VIEWER_HOUR = "10" }
 
 [[env.staging.ratelimits]]
 name = "API_LIMITER"

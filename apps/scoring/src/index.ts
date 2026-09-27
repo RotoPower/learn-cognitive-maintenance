@@ -13,6 +13,9 @@
  *  3. computes anomaly z-score flags and failure probabilities (src/score.ts);
  *  4. writes `runs`, `predictions`, and `alerts` (runs of the same tag < 24 h apart are
  *     one episode; an open alert is extended rather than duplicated).
+ *  5. closes what a corrective repair resolved: open alerts that started before the
+ *     asset's latest repair become 'resolved', and so do its open scoring work orders
+ *     ('done'); an episode that ended at a repair is recorded as already resolved.
  * Predict alerts and work orders (`maintenance_log`, source='scoring') are raised only when
  * PREDICT_ACTIONS=on: the current predict model is NO-GO, so staging keeps it off.
  *
@@ -24,7 +27,7 @@
 
 import {
   DEFAULT_ANOMALY, HOUR_MS, anomalyFlags, assetFeatures, drivers, episodes, hoursSinceRepair,
-  interpretDrivers, iso, makeGrid, ms, predictProba,
+  interpretDrivers, iso, makeGrid, ms, predictProba, segmentStart,
 } from "./score";
 import type { AnomalyConfig, Flag, PredictArtifact } from "./score";
 
@@ -73,7 +76,7 @@ async function artifact(env: Env, task: string, pinned: string | undefined): Pro
 
 function predictModel(a: StoredArtifact): PredictArtifact {
   const m = a.model as unknown as PredictArtifact;
-  return { ...m, run_id: a.run_id, horizon_days: Number((a.meta?.horizon_days as number) ?? 30) };
+  return { ...m, run_id: a.run_id, horizon_days: Number((a.meta?.horizon_days as number) ?? 30), config: m.config ?? {} };
 }
 
 function anomalyConfig(a: StoredArtifact | null): AnomalyConfig {
@@ -114,7 +117,11 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
   ]);
   const assets = await api<{ asset_id: string; tags: string[] }[]>(env, fetcher, "/assets");
   const log = await api<{ kind: string; asset_id: string; timestamp: string }[]>(env, fetcher, "/maintenance/log");
-  const repairs = log.filter((e) => e.kind === "corrective_repair");
+  const repairs = log.filter((e) => e.kind === "corrective_repair" && ms(e.timestamp) <= asOfMs);
+  const lastRepair = (asset: string): number | null => {
+    const ts = repairs.filter((r) => r.asset_id === asset).map((r) => ms(r.timestamp));
+    return ts.length ? Math.max(...ts) : null;
+  };
 
   const lookbackH = Number(env.LOOKBACK_DAYS ?? 60) * 24;
   const firstMs = asOfMs - (lookbackH - 1) * HOUR_MS;
@@ -130,13 +137,19 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
   const cfg = anomalyConfig(anomalyArt);
   const flags = anomalyFlags(grid, asOfMs, cfg);
   const eps = episodes(flags);
-  let opened = 0, extended = 0;
+  let opened = 0, extended = 0, resolved = 0;
   for (const e of eps) {
+    // An episode that a repair ended is history: record it resolved, never reopen it.
+    const endedByRepair = repairs.some((r) => r.asset_id === e.asset && ms(e.first_flag_ts) < ms(r.timestamp) && ms(e.last_flag_ts) <= ms(r.timestamp));
     const open = await env.DB.prepare(
       "SELECT id, last_flag_ts, severity FROM alerts WHERE asset_id = ? AND kind = 'anomaly' AND status = 'open' AND tag = ? ORDER BY last_flag_ts DESC LIMIT 1",
     ).bind(e.asset, e.tag).first<{ id: number; last_flag_ts: string; severity: number }>();
     rowsRead += open ? 1 : 0;
-    if (open && ms(e.first_flag_ts) - ms(open.last_flag_ts) < 24 * HOUR_MS) {
+    if (endedByRepair) {
+      const known = await env.DB.prepare("SELECT id FROM alerts WHERE asset_id = ? AND kind = 'anomaly' AND tag = ? AND first_flag_ts <= ? AND last_flag_ts >= ? LIMIT 1")
+        .bind(e.asset, e.tag, e.last_flag_ts, e.first_flag_ts).first<{ id: number }>();
+      if (!known) { writes.push(insertAlert(env, runIds.anomaly, e, "resolved")); resolved++; }
+    } else if (open && ms(e.first_flag_ts) - ms(open.last_flag_ts) < 24 * HOUR_MS) {
       writes.push(env.DB.prepare("UPDATE alerts SET last_flag_ts = MAX(last_flag_ts, ?), severity = MAX(severity, ?), run_id = ?, interpretation = CASE WHEN ? > severity THEN ? ELSE interpretation END WHERE id = ?")
         .bind(e.last_flag_ts, e.severity, runIds.anomaly, e.severity, e.interpretation, open.id));
       extended++;
@@ -145,7 +158,20 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
       opened++;
     }
   }
-  const anomalySummary = { artifact: anomalyArt?.run_id ?? null, flags: flags.length, episodes: eps.length, alerts_opened: opened, alerts_extended: extended };
+  // Close what repairs resolved (batch order: after the inserts/updates above).
+  let closedByRepair = 0;
+  for (const asset of cfg.target_assets) {
+    const r = lastRepair(asset);
+    if (r === null) continue;
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM alerts WHERE asset_id = ? AND status = 'open' AND first_flag_ts < ?").bind(asset, iso(r)).first<{ n: number }>();
+    closedByRepair += n?.n ?? 0;
+    writes.push(env.DB.prepare("UPDATE alerts SET status = 'resolved' WHERE asset_id = ? AND status = 'open' AND first_flag_ts < ?").bind(asset, iso(r)));
+    writes.push(env.DB.prepare("UPDATE maintenance_log SET status = 'done' WHERE asset_id = ? AND kind = 'workorder' AND source = 'scoring' AND status = 'open' AND ts < ?").bind(asset, iso(r)));
+  }
+  const anomalySummary = {
+    artifact: anomalyArt?.run_id ?? null, flags: flags.length, episodes: eps.length,
+    alerts_opened: opened, alerts_extended: extended, recorded_resolved: resolved, closed_by_repair: closedByRepair,
+  };
   out.anomaly = anomalySummary;
   writes.push(runRow(env, runIds.anomaly, "anomaly", asOf, anomalyArt?.run_id ?? null, started, { ...anomalySummary, config: cfg }));
 
@@ -161,11 +187,20 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
     const actions = env.PREDICT_ACTIONS === "on";
     const p: Record<string, number> = {};
     let alerts = 0, workorders = 0;
+    const persistence = Math.max(1, Number(art.config?.persistence ?? 1));
+    const reset = art.config?.reset_at_repairs === true;
+    const featuresAtDay = (asset: string, kk: number) =>
+      assetFeatures(grid, asset, kk, hoursSinceRepair(asset, firstMs + kk * HOUR_MS, repairs, dataStartMs), reset ? segmentStart(grid, asset, kk, repairs) : 0);
     for (const asset of cfg.target_assets) {
-      const f = assetFeatures(grid, asset, k, hoursSinceRepair(asset, featuresAtMs, repairs, dataStartMs));
+      const f = featuresAtDay(asset, k);
       const prob = predictProba(art, f);
       const d = drivers(art, f);
-      const alert = prob >= art.threshold;
+      // Alert rule of the artefact: `persistence` consecutive daily scores at or above threshold.
+      let alert = prob >= art.threshold;
+      for (let j = 1; alert && j < persistence; j++) {
+        const kk = k - 24 * j;
+        alert = kk >= 0 && predictProba(art, featuresAtDay(asset, kk)) >= art.threshold;
+      }
       const text = alert ? interpretDrivers(d) : `below threshold; weak signal ${interpretDrivers(d)}`;
       p[asset] = prob;
       writes.push(env.DB.prepare("INSERT OR REPLACE INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES (?, ?, ?, ?, ?, ?)")
@@ -200,9 +235,9 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
   return out;
 }
 
-function insertAlert(env: Env, runId: string, e: Flag): D1PreparedStatement {
-  return env.DB.prepare("INSERT INTO alerts(run_id, asset_id, tag, kind, first_flag_ts, last_flag_ts, severity, interpretation) VALUES (?, ?, ?, 'anomaly', ?, ?, ?, ?)")
-    .bind(runId, e.asset, e.tag, e.first_flag_ts, e.last_flag_ts, e.severity, e.interpretation);
+function insertAlert(env: Env, runId: string, e: Flag, status = "open"): D1PreparedStatement {
+  return env.DB.prepare("INSERT INTO alerts(run_id, asset_id, tag, kind, first_flag_ts, last_flag_ts, severity, interpretation, status) VALUES (?, ?, ?, 'anomaly', ?, ?, ?, ?, ?)")
+    .bind(runId, e.asset, e.tag, e.first_flag_ts, e.last_flag_ts, e.severity, e.interpretation, status);
 }
 
 function runRow(env: Env, runId: string, task: string, asOf: string, art: string | null, started: string, summary: unknown): D1PreparedStatement {

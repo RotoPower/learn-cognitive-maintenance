@@ -185,30 +185,46 @@ export interface PredictArtifact {
   intercept: number;
   threshold: number;
   horizon_days: number;
+  /** Training config: persistence = consecutive daily scores above threshold for an alert;
+   *  reset_at_repairs = feature windows never reach back across a corrective repair. */
+  config?: { persistence?: number; reset_at_repairs?: boolean; step_hours?: number };
 }
 
 export const LOAD_TAG = "PLANT.LOAD";
 
-function windowStats(x: Float64Array, k: number, len: number): { cnt: number; mean: number; slope: number } {
-  // window (t_k - len h, t_k] = indices k - len + 1 .. k; time in hours relative to k
+function windowStats(x: Float64Array, k: number, len: number, lo = 0): { cnt: number; mean: number; slope: number } {
+  // window (t_k - len h, t_k] = indices k - len + 1 .. k, never before `lo` (a repair); time in hours relative to k
+  const from = Math.max(0, lo, k - len + 1);
   let cnt = 0, sx = 0, st = 0;
-  for (let i = Math.max(0, k - len + 1); i <= k; i++) if (!Number.isNaN(x[i])) { cnt++; sx += x[i]; st += i - k; }
+  for (let i = from; i <= k; i++) if (!Number.isNaN(x[i])) { cnt++; sx += x[i]; st += i - k; }
   if (cnt === 0) return { cnt, mean: NaN, slope: NaN };
   const mx = sx / cnt, mt = st / cnt;
   let sxt = 0, stt = 0;
-  for (let i = Math.max(0, k - len + 1); i <= k; i++) if (!Number.isNaN(x[i])) { const dt = i - k - mt; sxt += (x[i] - mx) * dt; stt += dt * dt; }
+  for (let i = from; i <= k; i++) if (!Number.isNaN(x[i])) { const dt = i - k - mt; sxt += (x[i] - mx) * dt; stt += dt * dt; }
   const variance = stt / cnt;
   return { cnt, mean: mx, slope: variance > 1e-9 ? (sxt / cnt / variance) * 24 : NaN };
 }
 
-/** Feature row for one asset at grid index k (the sim day's 00:00). */
-export function assetFeatures(grid: Grid, asset: string, k: number, hoursSinceRepair: number): Record<string, number> {
+/** Grid index of the first hour at or after the asset's latest repair at or before index k
+ *  (0 when none): feature windows reset there, as in build_features(reset_at_repairs=True). */
+export function segmentStart(grid: Grid, asset: string, k: number, repairs: { asset_id: string; timestamp: string }[]): number {
+  const at = grid.first + k * HOUR_MS;
+  let last = -Infinity;
+  for (const r of repairs) {
+    const t = ms(r.timestamp);
+    if (r.asset_id === asset && t <= at && t > last) last = t;
+  }
+  return last === -Infinity ? 0 : Math.max(0, Math.ceil((last - grid.first) / HOUR_MS));
+}
+
+/** Feature row for one asset at grid index k (the sim day's 00:00); windows start no earlier than `lo`. */
+export function assetFeatures(grid: Grid, asset: string, k: number, hoursSinceRepair: number, lo = 0): Record<string, number> {
   const f: Record<string, number> = {};
   const w7 = 7 * 24, w30 = 30 * 24;
   for (const [tag, x] of Object.entries(grid.values)) {
     if (tag.split(".", 1)[0] !== asset || isDead(x)) continue;
     const short = tag.split(".", 2)[1];
-    const a = windowStats(x, k, w7), b = windowStats(x, k, w30);
+    const a = windowStats(x, k, w7, lo), b = windowStats(x, k, w30, lo);
     f[`${short}__cur`] = x[k];
     f[`${short}__mean7d`] = a.cnt >= 96 ? a.mean : NaN;
     f[`${short}__slope7d`] = a.cnt >= 96 ? a.slope : NaN;
@@ -216,7 +232,7 @@ export function assetFeatures(grid: Grid, asset: string, k: number, hoursSinceRe
   }
   const load = grid.values[LOAD_TAG];
   if (load) {
-    const a = windowStats(load, k, w7);
+    const a = windowStats(load, k, w7, lo);
     f["LOAD__cur"] = load[k];
     f["LOAD__mean7d"] = a.cnt >= 96 ? a.mean : NaN;
   }

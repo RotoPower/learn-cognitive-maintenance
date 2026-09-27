@@ -39,8 +39,17 @@ describe("GET /api/overview", () => {
     expect(byId.BFP1.days_since_maintenance).toBe(111);
     expect(byId.GT1.days_since_maintenance).toBeNull();
     expect(o.kpis).toMatchObject({ healthy: 3, warning: 0, critical: 1, predicted_failures_30d: 1, alerts_7d: 2, open_workorders: 0 });
-    expect(o.predict).toMatchObject({ trusted: false, threshold: 0.256, run_id: "score_2024-09-20_predict" }); // not the future run
+    expect(o.predict).toMatchObject({ trusted: true, threshold: 0.256, run_id: "score_2024-09-20_predict" }); // not the future run
     expect(o.alerts.map((a: { tag: string }) => a.tag)).not.toContain("CTF1.VIB");
+  });
+
+  it("with a trusted model, risk alone sets status: above threshold is critical, above half of it a warning", async () => {
+    await env.DB.prepare("INSERT INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES ('score_2024-09-20_predict', 'BFP1', '2024-09-20T00:00:00', 0.3, 30, ?), ('score_2024-09-20_predict', 'CTF1', '2024-09-20T00:00:00', 0.15, 30, ?)")
+      .bind(JSON.stringify({ drivers: [["VIB_DE__slope7d", 1]], threshold: 0.256 }), JSON.stringify({ drivers: [], threshold: 0.256 })).run();
+    const o = JSON.parse(await text(await api("/api/overview")));
+    const byId = Object.fromEntries(o.assets.map((a: { asset_id: string }) => [a.asset_id, a]));
+    expect(byId.BFP1).toMatchObject({ status: "critical", top_driver: "VIB_DE__slope7d", top_driver_source: "risk model" });
+    expect(byId.CTF1.status).toBe("warning");
   });
 });
 
@@ -52,7 +61,7 @@ describe("GET /api/asset/:id", () => {
     expect(a.trends.map((t: { tag: string }) => t.tag)).toEqual(["BFP2.VIB_DE", "BFP2.BRG_TEMP_DE"]);
     expect(a.trends[0].points.length).toBe(241); // 30 days at 3 h, both ends
     expect(a.alerts.length).toBe(2);
-    expect(a.prediction).toMatchObject({ p_fail: 0.97, trusted: false, interpretation: "consistent with bearing_wear (VIB_DE)" });
+    expect(a.prediction).toMatchObject({ p_fail: 0.97, trusted: true, interpretation: "consistent with bearing_wear (VIB_DE)" });
     expect(a.actions.source).toBe("interim");
     expect(a.mode).toBe("bearing_wear");
     const gt = JSON.parse(await text(await api("/api/asset/GT1")));

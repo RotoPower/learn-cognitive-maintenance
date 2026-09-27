@@ -13,7 +13,8 @@ crons = ["0 * * * *"]
 PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
 LOOKBACK_DAYS = "60"
 DATA_START = "2024-01-01T00:00:00"
-PREDICT_ACTIONS = "off"                       # predict model is NO-GO: no predict alerts / work orders
+PREDICT_ACTIONS = "on"                        # validator GO (2026-09-27): predict alerts + work orders
+PREDICT_ARTIFACT = "predict_fleet_h30_2024-01-01_s42_sym7"   # pinned: never act on a newer, unvalidated upload
 
 # Secrets: READ_TOKEN (plant API read token), ADMIN_TOKEN (POST /score)
 # -> `wrangler secret put READ_TOKEN --env staging`; locally in .dev.vars
@@ -26,7 +27,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 # ---------------------------------------------------------------- staging
 [env.staging]
 name = "plant-scoring-staging"
-vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", LOOKBACK_DAYS = "60", DATA_START = "2024-01-01T00:00:00", PREDICT_ACTIONS = "off" }
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", LOOKBACK_DAYS = "60", DATA_START = "2024-01-01T00:00:00", PREDICT_ACTIONS = "on", PREDICT_ARTIFACT = "predict_fleet_h30_2024-01-01_s42_sym7" }
 
 [env.staging.triggers]
 crons = ["0 * * * *"]
