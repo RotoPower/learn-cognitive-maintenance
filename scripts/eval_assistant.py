@@ -25,6 +25,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -118,6 +119,21 @@ def post(url: str, body: dict | None, headers: dict, timeout: float = 300) -> by
         return r.read()
 
 
+def prepare(url: str, headers: dict, attempts: int = 3) -> None:
+    """Ingest / scoring before a scenario. Local Workers share one SQLite file, so a call right
+    after a large ingest can hit a busy database: retry, and say why if it keeps failing."""
+    for i in range(attempts):
+        try:
+            post(url, None, headers)
+            return
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:300]
+            print(f"  {url} -> HTTP {e.code} (attempt {i + 1}/{attempts}): {detail}")
+            if i + 1 == attempts:
+                raise SystemExit(f"could not prepare the scenario: {url}")
+            time.sleep(5 * (i + 1))
+
+
 def ask(assistant: str, secret: str | None, session: str, message: str) -> tuple[str, list, list]:
     raw = post(f"{assistant}/chat", {"message": message, "session_id": session}, {"x-demo-secret": secret} if secret else {})
     text, tools, drafts = [], [], []
@@ -176,9 +192,9 @@ def main(argv: list[str] | None = None) -> int:
         adm.call("POST", "/clock/jump", body={"to": sc["as_of"]})
         hdr = {"authorization": f"Bearer {admin}"}
         if a.ingest_url:
-            post(f"{a.ingest_url.rstrip('/')}/ingest", None, hdr)
+            prepare(f"{a.ingest_url.rstrip('/')}/ingest", hdr)
         if a.scoring_url:
-            post(f"{a.scoring_url.rstrip('/')}/score?force=1", None, hdr)
+            prepare(f"{a.scoring_url.rstrip('/')}/score?force=1", hdr)
         session = f"eval-{sc['name'][:40]}-{int(time.time())}"
         lines += [f"## {sc['name']} (as of {sc['as_of']})", ""]
         for i, q in enumerate(sc["questions"], 1):
