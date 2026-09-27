@@ -1,0 +1,59 @@
+# Scoring Worker (D2.4): once per sim day, anomaly z-scores + failure risk from D1 readings.
+# Shares the plant-api D1 database (same database_id per environment); schema is owned and
+# migrated by apps/plant-api (migrations/0002 adds the indexes this Worker relies on).
+name = "plant-scoring"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+# At clock speed 60 one real hour is one sim day. A pass for an already-scored sim day is a no-op.
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
+LOOKBACK_DAYS = "60"
+DATA_START = "2024-01-01T00:00:00"
+PREDICT_ACTIONS = "off"                       # predict model is NO-GO: no predict alerts / work orders
+
+# Secrets: READ_TOKEN (plant API read token), ADMIN_TOKEN (POST /score)
+# -> `wrangler secret put READ_TOKEN --env staging`; locally in .dev.vars
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plant-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# ---------------------------------------------------------------- staging
+[env.staging]
+name = "plant-scoring-staging"
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", LOOKBACK_DAYS = "60", DATA_START = "2024-01-01T00:00:00", PREDICT_ACTIONS = "off" }
+
+[env.staging.triggers]
+crons = ["0 * * * *"]
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "plant-staging"
+database_id = "f639c0e5-a838-4d97-8b87-3f4328d1758f"
+
+# Worker-to-Worker calls must use a Service Binding (error 1042 over workers.dev).
+[[env.staging.services]]
+binding = "PLANT"
+service = "plant-api-staging"
+
+# ------------------------------------------------------------- production
+[env.production]
+name = "plant-scoring"
+vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", LOOKBACK_DAYS = "60", DATA_START = "2024-01-01T00:00:00", PREDICT_ACTIONS = "off" }
+
+[env.production.triggers]
+crons = ["0 * * * *"]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "plant-production"
+database_id = "REPLACE_WITH_OUTPUT_OF: wrangler d1 create plant-production"
+
+[[env.production.services]]
+binding = "PLANT"
+service = "plant-api"
