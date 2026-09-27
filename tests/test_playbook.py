@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from plant.api import create_app
+from plant.sim import FAULT_MODES
 
 _spec = importlib.util.spec_from_file_location("load_playbook", Path(__file__).resolve().parents[1] / "scripts" / "load_playbook.py")
 LP = importlib.util.module_from_spec(_spec)
@@ -30,7 +31,7 @@ def api(tmp_path):
 
 def test_every_mode_has_every_section() -> None:
     books = LP.load_all()
-    assert set(books) == {"bearing_wear", "compressor_fouling", "gearbox_wear"}
+    assert set(books) == set(FAULT_MODES) and len(books) == 8
     for mode, s in books.items():
         assert set(s) == {"symptoms", "checks", "actions", "spares", "lead_time"}, mode
         actions = [line for line in s["actions"].splitlines() if line.strip()]
@@ -57,7 +58,7 @@ def test_load_roundtrip_through_the_admin_api(api) -> None:
     assert code == 0
     got = client.get("/playbook", params={"mode": "gearbox_wear"}, headers={"Authorization": "Bearer r"}).json()
     assert set(got) == {"gearbox_wear"} and got["gearbox_wear"]["actions"] == LP.load_all()["gearbox_wear"]["actions"]
-    assert len(client.get("/playbook", headers={"Authorization": "Bearer r"}).json()) == 3
+    assert len(client.get("/playbook", headers={"Authorization": "Bearer r"}).json()) == len(FAULT_MODES) == 8
 
 
 def test_playbook_routes_guard_input(api) -> None:
@@ -69,3 +70,11 @@ def test_playbook_routes_guard_input(api) -> None:
     assert client.post("/admin/playbook", json={"mode": "bearing_wear", "sections": {}}, headers=admin).status_code == 422
     assert LP.main([], transport=lambda *a: (401, {"detail": "no"}), env={"PLANT_ADMIN_TOKEN": "bad"}) == 1
     assert LP.main([], env={}) == 3
+
+
+def test_each_playbook_names_its_modes_symptom_tags() -> None:
+    books = LP.load_all()
+    for mode, symptoms in FAULT_MODES.items():
+        text = books[mode]["symptoms"]
+        missing = [t for t in symptoms if t not in text]
+        assert not missing, (mode, missing)

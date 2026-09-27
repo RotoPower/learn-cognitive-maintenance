@@ -19,9 +19,10 @@ import sys
 from pathlib import Path
 
 from plant.cli import ApiError, Client, Transport, _load_dotenv, _urllib_transport
+from plant.sim import FAULT_MODES
 
 PLAYBOOK_DIR = Path("docs/playbook")
-MODES = ("bearing_wear", "compressor_fouling", "gearbox_wear")
+MODES = tuple(FAULT_MODES)  # one playbook per failure mode the simulator knows
 # heading text (lower case, starts with) -> D1 section key
 SECTIONS = {
     "symptoms": "symptoms",
