@@ -139,3 +139,23 @@ def test_episodes_merge_runs_less_than_a_day_apart():
         ("BFP2.VIB_DE", 2, 12, 6.0, "s6.0"),
         ("BFP2.VIB_DE", 1, 6, 3.5, "s3.5"),
     ]
+
+
+def test_symptom_map_covers_every_mode_on_every_family_it_applies_to():
+    """The hand-written map (from the maintenance-domain skill) agrees with the documented
+    modes: every symptom tag of a mode, with its direction, on each family the mode hits,
+    and nothing else. Reads the simulator's catalogue only in this test, never in the model."""
+    from plant.sim import FAULT_MODES, MODE_ASSETS
+
+    want = {
+        (A._family(asset), tag, mode, 1 if gain > 0 else -1)
+        for mode, assets in MODE_ASSETS.items()
+        for asset in assets
+        for tag, (gain, _shape) in FAULT_MODES[mode].items()
+    }
+    got = {(fam, tag, mode, sign) for (fam, tag), modes in A.FAILURE_MODES.items() for mode, sign, _ in modes}
+    assert got == want
+    assert set(A.MODE_TAGS) == set(FAULT_MODES)
+    assert all(set(A.MODE_TAGS[m]) == set(FAULT_MODES[m]) for m in FAULT_MODES)
+    assert A._family("HRSG2") == "HRSG" and A._family("GT1") == "GT" and A._family("BFP3") == "BFP"
+    assert "PLANT" not in A.TARGET_ASSETS and len(A.TARGET_ASSETS) == 14

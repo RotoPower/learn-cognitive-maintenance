@@ -27,7 +27,7 @@
 
 import {
   DEFAULT_ANOMALY, HOUR_MS, anomalyFlags, assetFeatures, drivers, episodes, hoursSinceRepair,
-  interpretDrivers, iso, makeGrid, ms, predictProba, segmentStart,
+  PREDICT_ASSETS, interpretDrivers, iso, makeGrid, ms, predictProba, segmentStart,
 } from "./score";
 import type { AnomalyConfig, Flag, PredictArtifact } from "./score";
 
@@ -134,7 +134,8 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
   const out: ScoreResult = { as_of: asOf, sim_day: simDay, rows_read: 0 };
 
   // ---- anomaly
-  const cfg = anomalyConfig(anomalyArt);
+  // Score every asset the plant lists, not the (older, shorter) list stored in the artefact.
+  const cfg = { ...anomalyConfig(anomalyArt), target_assets: assets.map((a) => a.asset_id).filter((a) => a !== "PLANT") };
   const flags = anomalyFlags(grid, asOfMs, cfg);
   const eps = episodes(flags);
   let opened = 0, extended = 0, resolved = 0;
@@ -191,7 +192,8 @@ export async function scoreOnce(env: Env, opts: { force?: boolean; fetcher?: Fet
     const reset = art.config?.reset_at_repairs === true;
     const featuresAtDay = (asset: string, kk: number) =>
       assetFeatures(grid, asset, kk, hoursSinceRepair(asset, firstMs + kk * HOUR_MS, repairs, dataStartMs), reset ? segmentStart(grid, asset, kk, repairs) : 0);
-    for (const asset of cfg.target_assets) {
+    const predictAssets = art.config?.target_assets ?? PREDICT_ASSETS;
+    for (const asset of predictAssets.filter((a) => cfg.target_assets.includes(a))) {
       const f = featuresAtDay(asset, k);
       const prob = predictProba(art, f);
       const d = drivers(art, f);

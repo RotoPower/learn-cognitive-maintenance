@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import fixture from "./fixtures/scoring.json";
 import {
-  anomalyFlags, assetFeatures, drivers, episodes, interpretDrivers, makeGrid, ms, predictProba, segmentStart, HOUR_MS,
+  FAILURE_MODES, anomalyFlags, assetFeatures, drivers, episodes, family, interpretAnomaly, interpretDrivers, makeGrid, ms,
+  predictProba, segmentStart, HOUR_MS,
 } from "../src/score";
 import type { AnomalyConfig, Flag, PredictArtifact } from "../src/score";
 
@@ -58,6 +59,35 @@ describe.each(fixture.cases)("parity with the Python scorers as of $as_of", (c) 
       expect(d.map(([n]) => n)).toEqual(want.drivers.map(([n]) => n));
       expect(interpretDrivers(d)).toBe(want.interpretation);
     }
+  });
+});
+
+describe.each(fixture.extra_anomaly_cases)("anomaly parity on the full plant's new assets as of $as_of", (c) => {
+  it("flags and interpretations match models/anomaly.py", () => {
+    const asOf = ms(c.as_of), first = ms(c.first_hour);
+    const rows = Object.entries(c.readings as Record<string, (number | null)[]>).flatMap(([tag, vals]) =>
+      vals.map((value, i) => ({ tag, ts: new Date(first + i * HOUR_MS).toISOString().slice(0, 19), value })));
+    const cfg = { ...(fixture.anomaly_config as AnomalyConfig) };
+    const got = anomalyFlags(makeGrid(first, asOf, rows), asOf, cfg);
+    const want = c.expected.anomaly;
+    expect(want.length).toBeGreaterThan(0);
+    expect(got.map((f) => [f.tag, f.first_flag_ts, f.last_flag_ts, f.hours_flagged, f.interpretation]))
+      .toEqual(want.map((f) => [f.tag, f.first_flag_ts, f.last_flag_ts, f.hours_flagged, f.interpretation]));
+    expect(want.every((f) => /tube_leak/.test(f.interpretation))).toBe(true);
+  });
+});
+
+describe("symptom map", () => {
+  it("equals models/anomaly.py FAILURE_MODES", () => {
+    expect(FAILURE_MODES).toEqual(fixture.symptom_map);
+  });
+  it("is shared by assets of one family", () => {
+    expect(["GT1", "GT2", "HRSG1", "HRSG2", "CWP1", "BFP3", "TX1"].map(family)).toEqual(["GT", "GT", "HRSG", "HRSG", "CWP", "BFP", "TX"]);
+    expect(interpretAnomaly("GT2", "GT2.CDP", -4)).toMatch(/compressor_fouling/);
+    expect(interpretAnomaly("CWP2", "CWP2.SEAL_LEAK_FLOW", 5)).toMatch(/seal_leak/);
+    expect(interpretAnomaly("CWP2", "CWP2.VIB_DE", 5)).toMatch(/bearing_wear/);
+    expect(interpretAnomaly("ST1", "ST1.LOAD_MW", 4)).toMatch(/opposite to blade_erosion/);
+    expect(interpretAnomaly("BFP3", "BFP3.FLOW", -4)).toMatch(/not a symptom tag/);
   });
 });
 

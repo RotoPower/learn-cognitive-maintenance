@@ -10,7 +10,7 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.toml" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, READ_TOKEN: "r", ADMIN_TOKEN: "a", PLANT_API_URL: "http://plant", LOOKBACK_DAYS: "60", DATA_START: "2024-01-01T00:00:00", PREDICT_ACTIONS: "off" },
+          bindings: { TEST_MIGRATIONS: migrations, READ_TOKEN: "r", ADMIN_TOKEN: "a", PLANT_API_URL: "http://plant", LOOKBACK_DAYS: "37", DATA_START: "2024-01-01T00:00:00", PREDICT_ACTIONS: "off" },
         },
       }),
     ],

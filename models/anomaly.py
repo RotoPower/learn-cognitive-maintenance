@@ -28,31 +28,59 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-TARGET_ASSETS = ["GT1", "BFP1", "BFP2", "CTF1"]
+from plant.sim import ASSETS
+
+# Every asset in the plant's tag catalogue (tag names only; no ground truth). PLANT.LOAD is
+# context, never scored.
+TARGET_ASSETS = [a for a in ASSETS if a != "PLANT"]
 DERIVED_DIR = Path("data/derived")
 REPORTS_DIR = Path("reports")
 ARTIFACT_DIR = Path("models/artifacts")
 
 # Failure-mode symptom map from .claude/skills/maintenance-domain/SKILL.md.
-# key: (asset family, TAG) -> list of (mode, expected_sign, note)
+# key: (asset family, TAG) -> list of (mode, expected_sign, note). The family is the asset
+# name without its number (GT1 -> GT), so GT2 reads like GT1 and CWP2 like CWP1.
+# Same map as apps/scoring/src/score.ts (FAILURE_MODES); tests/test_anomaly.py checks both
+# against the documented symptoms.
 FAILURE_MODES: dict[tuple[str, str], list[tuple[str, int, str]]] = {
     ("BFP", "VIB_DE"): [("bearing_wear", +1, "DE vibration rising: primary bearing_wear symptom")],
     ("BFP", "BRG_TEMP_DE"): [("bearing_wear", +1, "DE bearing temperature rising: bearing_wear symptom")],
     ("BFP", "VIB_NDE"): [("bearing_wear", +1, "NDE vibration rising: weak bearing_wear symptom (gain 0.8)")],
     ("BFP", "MOTOR_CURR"): [("bearing_wear", +1, "motor current rising: secondary bearing_wear symptom")],
-    ("GT1", "CDP"): [("compressor_fouling", -1, "CDP falling: compressor_fouling symptom")],
-    ("GT1", "EXH_TEMP"): [("compressor_fouling", +1, "exhaust temperature rising: compressor_fouling symptom")],
-    ("GT1", "FUEL_FLOW"): [("compressor_fouling", +1, "fuel flow rising at load: compressor_fouling symptom")],
-    ("GT1", "LOAD_MW"): [("compressor_fouling", -1, "MW output falling: compressor_fouling symptom")],
-    ("CTF1", "GBX_OIL_TEMP"): [("gearbox_wear", +1, "gearbox oil temperature rising: leading gearbox_wear symptom")],
-    ("CTF1", "VIB"): [("gearbox_wear", +1, "fan vibration rising: late gearbox_wear symptom")],
-    ("CTF1", "MOTOR_CURR"): [("gearbox_wear", +1, "motor current rising: secondary gearbox_wear symptom")],
+    ("CWP", "VIB_DE"): [("bearing_wear", +1, "DE vibration rising: primary bearing_wear symptom")],
+    ("CWP", "BRG_TEMP_DE"): [("bearing_wear", +1, "DE bearing temperature rising: bearing_wear symptom")],
+    ("CWP", "VIB_NDE"): [("bearing_wear", +1, "NDE vibration rising: weak bearing_wear symptom (gain 0.8)")],
+    ("CWP", "MOTOR_CURR"): [("bearing_wear", +1, "motor current rising: secondary bearing_wear symptom")],
+    ("CWP", "SEAL_LEAK_FLOW"): [("seal_leak", +1, "seal leak-off flow rising: primary seal_leak symptom")],
+    ("CWP", "DISCH_PRESS"): [("seal_leak", -1, "discharge pressure falling: seal_leak symptom")],
+    ("CWP", "FLOW"): [("seal_leak", -1, "delivered flow falling: seal_leak symptom")],
+    ("GT", "CDP"): [("compressor_fouling", -1, "CDP falling: compressor_fouling symptom")],
+    ("GT", "EXH_TEMP"): [("compressor_fouling", +1, "exhaust temperature rising: compressor_fouling symptom")],
+    ("GT", "FUEL_FLOW"): [("compressor_fouling", +1, "fuel flow rising at load: compressor_fouling symptom")],
+    ("GT", "LOAD_MW"): [("compressor_fouling", -1, "MW output falling: compressor_fouling symptom")],
+    ("CTF", "GBX_OIL_TEMP"): [("gearbox_wear", +1, "gearbox oil temperature rising: leading gearbox_wear symptom")],
+    ("CTF", "VIB"): [("gearbox_wear", +1, "fan vibration rising: late gearbox_wear symptom")],
+    ("CTF", "MOTOR_CURR"): [("gearbox_wear", +1, "motor current rising: secondary gearbox_wear symptom")],
+    ("HRSG", "MAKEUP_FLOW"): [("tube_leak", +1, "make-up water flow rising: primary tube_leak symptom")],
+    ("HRSG", "FW_FLOW"): [("tube_leak", +1, "feedwater flow rising above steam flow: tube_leak symptom")],
+    ("HRSG", "STACK_TEMP"): [("tube_leak", -1, "stack temperature falling (water in the gas path): tube_leak symptom")],
+    ("HRSG", "DRUM_PRESS"): [("tube_leak", -1, "drum pressure falling: tube_leak symptom")],
+    ("ST", "LOAD_MW"): [("blade_erosion", -1, "MW output falling at the same steam: blade_erosion symptom")],
+    ("ST", "STAGE_PRESS"): [("blade_erosion", +1, "first-stage pressure rising: blade_erosion symptom")],
+    ("ST", "VIB_1"): [("blade_erosion", +1, "vibration rising: late blade_erosion symptom")],
+    ("GEN", "STATOR_TEMP_1"): [("winding_overheat", +1, "stator temperature rising at the same MW: winding_overheat symptom")],
+    ("GEN", "STATOR_TEMP_2"): [("winding_overheat", +1, "stator temperature rising at the same MW: winding_overheat symptom")],
+    ("GEN", "PD_ACTIVITY"): [("winding_overheat", +1, "partial discharge rising: late winding_overheat symptom")],
+    ("GEN", "COOLANT_TEMP"): [("winding_overheat", +1, "coolant temperature rising slightly: weak winding_overheat symptom")],
+    ("TX", "H2_PPM"): [("oil_degradation", +1, "dissolved hydrogen rising: primary oil_degradation symptom")],
+    ("TX", "MOISTURE_PPM"): [("oil_degradation", +1, "oil moisture rising: oil_degradation symptom")],
+    ("TX", "TOP_OIL_TEMP"): [("oil_degradation", +1, "top-oil temperature rising at the same load: weak oil_degradation symptom")],
 }
-MODE_TAGS = {
-    "bearing_wear": ["VIB_DE", "BRG_TEMP_DE", "VIB_NDE", "MOTOR_CURR"],
-    "compressor_fouling": ["CDP", "EXH_TEMP", "FUEL_FLOW", "LOAD_MW"],
-    "gearbox_wear": ["GBX_OIL_TEMP", "VIB", "MOTOR_CURR"],
-}
+MODE_TAGS: dict[str, list[str]] = {}
+for (_fam, _tag), _modes in FAILURE_MODES.items():
+    for _mode, _sign, _note in _modes:
+        if _tag not in MODE_TAGS.setdefault(_mode, []):
+            MODE_TAGS[_mode].append(_tag)
 
 
 @dataclass
@@ -179,7 +207,8 @@ def score_table(df: pd.DataFrame, meta: dict, as_of: pd.Timestamp, cfg: Config):
 
 
 def _family(asset: str) -> str:
-    return "BFP" if asset.startswith("BFP") else asset
+    """GT1 -> GT, HRSG2 -> HRSG: assets of one kind share a symptom map."""
+    return asset.rstrip("0123456789")
 
 
 def interpret(asset: str, tag: str, z_signed: float) -> str:
@@ -284,7 +313,7 @@ def write_report(path: Path, flags, rollup, cfg: Config, info: dict, eps: list[d
         else:
             lines.append("None.")
     lines += ["", "## Per-asset summary", ""]
-    for asset in cfg.target_assets:
+    for asset in info.get("assets_scored", cfg.target_assets):
         r = rollup.get(asset)
         if not r:
             lines.append(f"- **{asset}**: no flags.")
@@ -306,7 +335,7 @@ def write_report(path: Path, flags, rollup, cfg: Config, info: dict, eps: list[d
         "a NaN or an hour gap breaks a run.",
         "- Severity: max |z| within the run; sign in parentheses is the direction of the peak.",
         f"- Exclusions: dead tags {info['dead_tags']}; outage windows {info['outage_windows']} "
-        f"(set to NaN before baselining). Only target assets {cfg.target_assets} are scored; PLANT.LOAD is not scored.",
+        f"(set to NaN before baselining). Assets scored (in the input): {', '.join(info.get('assets_scored', cfg.target_assets))}; PLANT.LOAD is not scored.",
         "- Reported flags: runs intersecting the scoring window; first_flag_ts is the true run start "
         "even if before the window.",
         f"- Input: `{info['input']}` with sidecar `{info['sidecar']}`.",
@@ -374,6 +403,7 @@ def run_score(
         "sidecar": sidecar.as_posix() if sidecar.exists() else None,
         "dead_tags": meta.get("dead_tags", []),
         "outage_windows": meta.get("outage_windows", []),
+        "assets_scored": [a for a in cfg.target_assets if a in {s["asset"] for s in stats}],
     }
     report_path = report_dir / f"anomaly_{date}.md"
     write_report(report_path, flags, rollup, cfg, info, eps)

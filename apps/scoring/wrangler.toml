@@ -5,7 +5,7 @@ name = "plant-scoring"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
 
-# At clock speed 60 one real hour is one sim day. A pass for an already-scored sim day is a no-op.
+# At clock speed 30 one real hour is half a sim day. A pass for an already-scored sim day is a no-op.
 [triggers]
 crons = ["0 * * * *"]
 

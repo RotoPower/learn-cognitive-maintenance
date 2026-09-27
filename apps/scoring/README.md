@@ -5,14 +5,17 @@ the results back to D1 for the dashboard:
 
 - **anomaly**: 30-day rolling z-scores per tag (window closed on the left), a flag for
   every run of >= 6 h with |z| > 3, rolled up into episodes (runs of one tag < 24 h apart)
-  and written to `alerts` (an open alert is extended, not duplicated). Config comes from
-  the latest `anomaly` artefact in `model_artifacts`.
-- **predict**: the daily feature row per asset (current, 7-day mean, 7- and 30-day
+  and written to `alerts` (an open alert is extended, not duplicated). Every asset the
+  plant API lists (`/assets`, 14 in the full plant) is scored; thresholds come from the
+  latest `anomaly` artefact in `model_artifacts`. Each flag is read against the symptom
+  map of the asset's family (GT1 and GT2 share `GT`), the same map as `models/anomaly.py`.
+- **predict**: for the assets the model was validated on (`PREDICT_ASSETS`: GT1, BFP1,
+  BFP2, CTF1; the new assets follow in roadmap Phase 3), the daily feature row per asset (current, 7-day mean, 7- and 30-day
   slopes, load, hours since repair), standardised with the latest `predict` artefact,
   logistic probability and top drivers, written to `predictions`. With
   `PREDICT_ACTIONS=on`, a probability at or above the artefact's threshold also opens a
   `predict` alert and an inspection work order in `maintenance_log` (`source='scoring'`).
-  **Off in staging and production** while the predict model is NO-GO.
+  On in staging since the validator's GO (`PREDICT_ACTIONS=on`); off in production.
 
 Both scorers are ports of the Python code (`models/anomaly.py`, `models/predict/`);
 `test/score.test.ts` checks them against `test/fixtures/scoring.json`, regenerated with

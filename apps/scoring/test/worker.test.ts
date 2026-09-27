@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import fixture from "./fixtures/scoring.json";
 import worker, { scoreOnce } from "../src/index";
 import type { Env, Fetcher } from "../src/index";
-import { HOUR_MS, ms } from "../src/score";
+import { HOUR_MS, PREDICT_ASSETS, ms } from "../src/score";
 
 const testEnv = (over: Partial<Env> = {}): Env => ({ ...(env as unknown as Env), ...over });
 const readings = fixture.readings as Record<string, (number | null)[]>;
@@ -28,7 +28,7 @@ async function count(sql: string): Promise<number> {
 }
 
 beforeAll(async () => {
-  // readings: 24 tags x 1440 hours from the fixture; D1 allows 100 bound parameters per statement
+  // readings: every tag over the union of the two cases' lookback windows; D1 allows 100 bound parameters per statement
   const first = ms(fixture.first_hour);
   const rows = Object.entries(readings).flatMap(([tag, vals]) =>
     vals.map((v, i) => [tag, new Date(first + i * HOUR_MS).toISOString().slice(0, 19), v] as const),
@@ -65,7 +65,8 @@ describe("scoreOnce", () => {
     expect(r.anomaly).toMatchObject({ artifact: "anomaly_fleet_2024-09-20_r1", flags: before.expected.anomaly.length });
     const pred = r.predict as { p_fail: Record<string, number>; features_at: string; alerts: number; workorders: number };
     expect(pred.features_at).toBe("2024-09-20T00:00:00");
-    for (const p of before.expected.predict) expect(pred.p_fail[p.asset]).toBeCloseTo(p.p_fail, 9);
+    for (const p of before.expected.predict.filter((p) => PREDICT_ASSETS.includes(p.asset))) expect(pred.p_fail[p.asset]).toBeCloseTo(p.p_fail, 9);
+    expect(Object.keys(pred.p_fail).sort()).toEqual([...PREDICT_ASSETS].sort()); // new assets: no risk score until Phase 3
     expect(pred.alerts).toBe(0); // PREDICT_ACTIONS=off
     expect(pred.workorders).toBe(0);
 
@@ -78,8 +79,9 @@ describe("scoreOnce", () => {
     expect(await count("SELECT COUNT(*) AS n FROM maintenance_log")).toBe(0);
 
     const tags = Object.keys(readings).length;
-    expect(r.rows_read).toBeGreaterThanOrEqual(tags * 1440);
-    expect(r.rows_read).toBeLessThan(tags * 1440 + 200); // nothing outside the window, e.g. not the 2204 row
+    const window = fixture.lookback_days * 24;
+    expect(r.rows_read).toBeGreaterThanOrEqual(tags * window);
+    expect(r.rows_read).toBeLessThan(tags * window + 200); // nothing outside the window, e.g. not the 2204 row
   });
 
   it("is a no-op for a sim day already scored; force re-runs extend alerts instead of duplicating them", async () => {
@@ -96,7 +98,7 @@ describe("scoreOnce", () => {
   it("raises one predict alert and one work order per asset when PREDICT_ACTIONS=on", async () => {
     const on = testEnv({ PREDICT_ACTIONS: "on" });
     const r = await scoreOnce(on, { fetcher: fakeApi() });
-    const hot = before.expected.predict.filter((p) => p.alert).map((p) => p.asset); // 2 consecutive days above threshold
+    const hot = before.expected.predict.filter((p) => p.alert && PREDICT_ASSETS.includes(p.asset)).map((p) => p.asset); // 2 consecutive days above threshold
     expect(hot).toContain("BFP2");
     expect((r.predict as { alerts: number }).alerts).toBe(hot.length);
     const wos = await env.DB.prepare("SELECT wo_id, asset_id, source, description FROM maintenance_log WHERE kind='workorder' ORDER BY wo_id")

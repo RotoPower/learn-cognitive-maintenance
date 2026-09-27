@@ -60,10 +60,16 @@ export interface AnomalyConfig {
   target_assets: string[];
 }
 
+/** `target_assets` is replaced at run time by every asset the plant API lists (/assets). */
 export const DEFAULT_ANOMALY: AnomalyConfig = {
   baseline_days: 30, min_periods_hours: 480, z_threshold: 3, min_run_hours: 6, window_days: 7,
-  target_assets: ["GT1", "BFP1", "BFP2", "CTF1"],
+  target_assets: [],
 };
+
+/** The assets the predict model was trained and validated on. The other ten get no risk
+ *  score until a model covers their modes (docs/roadmap-full.md, Phase 3); an artefact can
+ *  widen this with `config.target_assets`. */
+export const PREDICT_ASSETS = ["GT1", "BFP1", "BFP2", "CTF1"];
 
 /** z-score of each hour against the `hours` hours strictly before it (ddof = 1). */
 export function zscores(x: Float64Array, hours: number, minPeriods: number): Float64Array {
@@ -99,24 +105,49 @@ export interface Flag {
   interpretation: string;
 }
 
-const FAILURE_MODES: Record<string, [string, number, string][]> = {
+// key: `${family}.${TAG}`, family = asset name without its number (GT1 -> GT).
+// Same map as models/anomaly.py (FAILURE_MODES).
+export const FAILURE_MODES: Record<string, [string, number, string][]> = {
   "BFP.VIB_DE": [["bearing_wear", +1, "DE vibration rising: primary bearing_wear symptom"]],
   "BFP.BRG_TEMP_DE": [["bearing_wear", +1, "DE bearing temperature rising: bearing_wear symptom"]],
   "BFP.VIB_NDE": [["bearing_wear", +1, "NDE vibration rising: weak bearing_wear symptom (gain 0.8)"]],
   "BFP.MOTOR_CURR": [["bearing_wear", +1, "motor current rising: secondary bearing_wear symptom"]],
-  "GT1.CDP": [["compressor_fouling", -1, "CDP falling: compressor_fouling symptom"]],
-  "GT1.EXH_TEMP": [["compressor_fouling", +1, "exhaust temperature rising: compressor_fouling symptom"]],
-  "GT1.FUEL_FLOW": [["compressor_fouling", +1, "fuel flow rising at load: compressor_fouling symptom"]],
-  "GT1.LOAD_MW": [["compressor_fouling", -1, "MW output falling: compressor_fouling symptom"]],
-  "CTF1.GBX_OIL_TEMP": [["gearbox_wear", +1, "gearbox oil temperature rising: leading gearbox_wear symptom"]],
-  "CTF1.VIB": [["gearbox_wear", +1, "fan vibration rising: late gearbox_wear symptom"]],
-  "CTF1.MOTOR_CURR": [["gearbox_wear", +1, "motor current rising: secondary gearbox_wear symptom"]],
+  "CWP.VIB_DE": [["bearing_wear", +1, "DE vibration rising: primary bearing_wear symptom"]],
+  "CWP.BRG_TEMP_DE": [["bearing_wear", +1, "DE bearing temperature rising: bearing_wear symptom"]],
+  "CWP.VIB_NDE": [["bearing_wear", +1, "NDE vibration rising: weak bearing_wear symptom (gain 0.8)"]],
+  "CWP.MOTOR_CURR": [["bearing_wear", +1, "motor current rising: secondary bearing_wear symptom"]],
+  "CWP.SEAL_LEAK_FLOW": [["seal_leak", +1, "seal leak-off flow rising: primary seal_leak symptom"]],
+  "CWP.DISCH_PRESS": [["seal_leak", -1, "discharge pressure falling: seal_leak symptom"]],
+  "CWP.FLOW": [["seal_leak", -1, "delivered flow falling: seal_leak symptom"]],
+  "GT.CDP": [["compressor_fouling", -1, "CDP falling: compressor_fouling symptom"]],
+  "GT.EXH_TEMP": [["compressor_fouling", +1, "exhaust temperature rising: compressor_fouling symptom"]],
+  "GT.FUEL_FLOW": [["compressor_fouling", +1, "fuel flow rising at load: compressor_fouling symptom"]],
+  "GT.LOAD_MW": [["compressor_fouling", -1, "MW output falling: compressor_fouling symptom"]],
+  "CTF.GBX_OIL_TEMP": [["gearbox_wear", +1, "gearbox oil temperature rising: leading gearbox_wear symptom"]],
+  "CTF.VIB": [["gearbox_wear", +1, "fan vibration rising: late gearbox_wear symptom"]],
+  "CTF.MOTOR_CURR": [["gearbox_wear", +1, "motor current rising: secondary gearbox_wear symptom"]],
+  "HRSG.MAKEUP_FLOW": [["tube_leak", +1, "make-up water flow rising: primary tube_leak symptom"]],
+  "HRSG.FW_FLOW": [["tube_leak", +1, "feedwater flow rising above steam flow: tube_leak symptom"]],
+  "HRSG.STACK_TEMP": [["tube_leak", -1, "stack temperature falling (water in the gas path): tube_leak symptom"]],
+  "HRSG.DRUM_PRESS": [["tube_leak", -1, "drum pressure falling: tube_leak symptom"]],
+  "ST.LOAD_MW": [["blade_erosion", -1, "MW output falling at the same steam: blade_erosion symptom"]],
+  "ST.STAGE_PRESS": [["blade_erosion", +1, "first-stage pressure rising: blade_erosion symptom"]],
+  "ST.VIB_1": [["blade_erosion", +1, "vibration rising: late blade_erosion symptom"]],
+  "GEN.STATOR_TEMP_1": [["winding_overheat", +1, "stator temperature rising at the same MW: winding_overheat symptom"]],
+  "GEN.STATOR_TEMP_2": [["winding_overheat", +1, "stator temperature rising at the same MW: winding_overheat symptom"]],
+  "GEN.PD_ACTIVITY": [["winding_overheat", +1, "partial discharge rising: late winding_overheat symptom"]],
+  "GEN.COOLANT_TEMP": [["winding_overheat", +1, "coolant temperature rising slightly: weak winding_overheat symptom"]],
+  "TX.H2_PPM": [["oil_degradation", +1, "dissolved hydrogen rising: primary oil_degradation symptom"]],
+  "TX.MOISTURE_PPM": [["oil_degradation", +1, "oil moisture rising: oil_degradation symptom"]],
+  "TX.TOP_OIL_TEMP": [["oil_degradation", +1, "top-oil temperature rising at the same load: weak oil_degradation symptom"]],
 };
+
+/** GT1 -> GT, HRSG2 -> HRSG: assets of one kind share a symptom map. */
+export const family = (asset: string): string => asset.replace(/\d+$/, "");
 
 export function interpretAnomaly(asset: string, tag: string, zSigned: number): string {
   const short = tag.split(".", 2)[1];
-  const family = asset.startsWith("BFP") ? "BFP" : asset;
-  const modes = FAILURE_MODES[`${family}.${short}`];
+  const modes = FAILURE_MODES[`${family(asset)}.${short}`];
   const direction = zSigned > 0 ? "up" : "down";
   if (!modes) return `${short} ${direction}: not a symptom tag of any documented failure mode`;
   for (const [, sign, note] of modes) if (Math.sign(zSigned) === sign) return note;
@@ -187,7 +218,7 @@ export interface PredictArtifact {
   horizon_days: number;
   /** Training config: persistence = consecutive daily scores above threshold for an alert;
    *  reset_at_repairs = feature windows never reach back across a corrective repair. */
-  config?: { persistence?: number; reset_at_repairs?: boolean; step_hours?: number };
+  config?: { persistence?: number; reset_at_repairs?: boolean; target_assets?: string[]; step_hours?: number };
 }
 
 export const LOAD_TAG = "PLANT.LOAD";
