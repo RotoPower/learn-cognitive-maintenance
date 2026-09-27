@@ -65,6 +65,19 @@ def _ts(s: str | None, name: str) -> datetime | None:
         raise ToolError(f"{name}: expected an ISO time like 2024-09-20T00:00:00, got '{s}'") from None
 
 
+UNAVAILABLE = "unavailable right now (plant database error); do not read this as 'none'"
+
+
+def _optional(api: PlantApi, path: str, params: dict, missing: list[str]) -> Any:
+    """Scoring outputs and the CMMS log live in the database; readings are computed without it.
+    If the database fails, keep the readings and mark what is missing instead of failing the tool."""
+    try:
+        return api.call("GET", path, params=params)
+    except Exception as e:
+        missing.append(f"{path}: {str(e)[:120]}")
+        return None
+
+
 def _r(v: float | None, nd: int = 3) -> float | None:
     return None if v is None else round(float(v), nd)
 
@@ -91,10 +104,11 @@ def get_asset_status(api: PlantApi, asset_id: str) -> dict:
     clock = api.call("GET", "/clock")
     latest = api.call("GET", "/tags/latest", params={"asset_id": asset})
     plant = api.call("GET", "/tags/latest")  # the fleet scan carries PLANT.LOAD
-    alerts = api.call("GET", "/alerts", params={"asset_id": asset, "status": "open"})
-    preds = api.call("GET", "/predictions", params={"asset_id": asset, "limit": 2})
-    log = api.call("GET", "/maintenance/log", params={"asset_id": asset})
-    repairs = [e for e in log if e.get("kind") == "corrective_repair"]
+    missing: list[str] = []
+    alerts = _optional(api, "/alerts", {"asset_id": asset, "status": "open"}, missing)
+    preds = _optional(api, "/predictions", {"asset_id": asset, "limit": 2}, missing)
+    log = _optional(api, "/maintenance/log", {"asset_id": asset}, missing)
+    repairs = [e for e in log if e.get("kind") == "corrective_repair"] if log is not None else None
     risk = None
     if preds:
         p = preds[0]
@@ -102,21 +116,24 @@ def get_asset_status(api: PlantApi, asset_id: str) -> dict:
         risk["p_fail"] = _r(risk["p_fail"])
         if len(preds) > 1:
             risk["previous"] = {"as_of": preds[1]["as_of"], "p_fail": _r(preds[1]["p_fail"])}
-    return {
+    out = {
         "asset_id": asset,
         "failure_mode_watched": ASSET_MODE[asset],
         "sim_time": clock.get("sim_time"),
         "readings_at": latest.get("timestamp"),
         "readings": {tag: _reading(tag, v) for tag, v in latest.get("values", {}).items()},
         "plant_load": _reading("PLANT.LOAD", (plant.get("values") or {}).get("PLANT.LOAD")),
-        "open_alerts": [_alert(a) for a in alerts],
-        "risk": risk if risk else "no risk score yet (scoring has not run for this asset)",
-        "last_repair": repairs[-1]["timestamp"] if repairs else None,
+        "open_alerts": [_alert(a) for a in alerts] if alerts is not None else UNAVAILABLE,
+        "risk": risk if risk else (UNAVAILABLE if preds is None else "no risk score yet (scoring has not run for this asset)"),
+        "last_repair": (repairs[-1]["timestamp"] if repairs else None) if repairs is not None else UNAVAILABLE,
         "open_workorders": [
             {k: e.get(k) for k in ("id", "type", "timestamp", "status", "description")}
             for e in log if e.get("kind") == "workorder" and e.get("status") == "open"
-        ],
+        ] if log is not None else UNAVAILABLE,
     }
+    if missing:
+        out["unavailable"] = missing
+    return out
 
 
 def _alert(a: dict) -> dict:
@@ -140,9 +157,11 @@ def get_events(api: PlantApi, asset_id: str, from_: str | None = None, to: str |
     if (t1 - t0) > timedelta(days=62):
         raise ToolError("window too long: 62 days at most")
     w = {"from": t0.isoformat(), "to": t1.isoformat()}
-    alerts = api.call("GET", "/alerts", params={"asset_id": asset, **w})
-    preds = api.call("GET", "/predictions", params={"asset_id": asset, **w, "limit": 70})
-    log = [e for e in api.call("GET", "/maintenance/log", params={"asset_id": asset}) if w["from"] <= str(e.get("timestamp")) <= w["to"]]
+    missing: list[str] = []
+    alerts = _optional(api, "/alerts", {"asset_id": asset, **w}, missing)
+    preds = _optional(api, "/predictions", {"asset_id": asset, **w, "limit": 70}, missing)
+    full_log = _optional(api, "/maintenance/log", {"asset_id": asset}, missing)
+    log = [e for e in full_log if w["from"] <= str(e.get("timestamp")) <= w["to"]] if full_log is not None else None
     assets = api.call("GET", "/assets")
     tags = next((a["tags"] for a in assets if a["asset_id"] == asset), [])
     trend = {}
@@ -157,21 +176,24 @@ def get_events(api: PlantApi, asset_id: str, from_: str | None = None, to: str |
         unit, base = TAG_INFO.get(tag, ("", None))
         trend[tag] = {"unit": unit, "baseline": base, "start": _r(vals[0][1]), "end": _r(vals[-1][1]),
                       "max": _r(hi[1]), "max_at": hi[0], "samples": len(vals)}
-    crossings = [p["as_of"] for p in sorted(preds, key=lambda p: p["as_of"]) if p.get("alert")]
-    return {
+    crossings = [p["as_of"] for p in sorted(preds or [], key=lambda p: p["as_of"]) if p.get("alert")]
+    out = {
         "asset_id": asset,
         "window": w,
-        "alerts": [_alert(a) for a in alerts],
-        "risk": {
+        "alerts": [_alert(a) for a in alerts] if alerts is not None else UNAVAILABLE,
+        "risk": UNAVAILABLE if preds is None else {
             "scores": len(preds),
             "first": {"as_of": preds[-1]["as_of"], "p_fail": _r(preds[-1]["p_fail"])} if preds else None,
             "last": {"as_of": preds[0]["as_of"], "p_fail": _r(preds[0]["p_fail"])} if preds else None,
             "max_p_fail": _r(max(p["p_fail"] for p in preds)) if preds else None,
             "alert_days": crossings,
         },
-        "maintenance": [{k: e.get(k) for k in ("kind", "id", "type", "timestamp", "status", "description")} for e in log],
+        "maintenance": [{k: e.get(k) for k in ("kind", "id", "type", "timestamp", "status", "description")} for e in log] if log is not None else UNAVAILABLE,
         "trend_6h": trend,
     }
+    if missing:
+        out["unavailable"] = missing
+    return out
 
 
 # ------------------------------------------------------------------ tool 3
@@ -204,7 +226,7 @@ def get_recommendations(api: PlantApi, failure_mode: str, severity: str = "warni
         raise ToolError(f"unknown failure mode '{failure_mode}'; use one of {', '.join(MODES)}")
     if severity not in SEVERITIES:
         raise ToolError(f"severity must be one of {', '.join(SEVERITIES)}")
-    book = (api.call("GET", "/playbook", params={"mode": failure_mode}) or {}).get(failure_mode) or {}
+    book = (_optional(api, "/playbook", {"mode": failure_mode}, []) or {}).get(failure_mode) or {}
     source = "playbook (D1)"
     if not book:
         book, source = _local_playbook(failure_mode), f"docs/playbook/{failure_mode}.md"

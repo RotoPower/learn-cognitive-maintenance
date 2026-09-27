@@ -182,3 +182,24 @@ def test_rate_limit_and_input_validation(client) -> None:
     assert c.post("/chat", json={"message": "", "session_id": "sess-cccccccc"}, headers=h2).status_code == 422
     assert c.post("/chat", json={"message": "hi", "session_id": "bad id!"}, headers=h2).status_code == 422
     assert c.get("/health").json()["auth"] == "X-Demo-Secret"
+
+
+class DbDownPlant(FakePlant):
+    """Staging with D1 over its daily limit: database-backed routes fail, readings do not."""
+
+    def call(self, method, path, params=None, body=None):
+        if path in ("/alerts", "/predictions", "/maintenance/log", "/playbook"):
+            raise RuntimeError("HTTP 500: D1_ERROR daily row read limit")
+        return super().call(method, path, params, body)
+
+
+def test_tools_degrade_when_the_database_is_down() -> None:
+    s = T.get_asset_status(DbDownPlant(), "BFP2")
+    assert s["readings"]["BFP2.VIB_DE"]["value"] == 3.1  # readings still come through
+    for k in ("open_alerts", "risk", "last_repair", "open_workorders"):
+        assert s[k] == T.UNAVAILABLE, k  # never an empty list that reads as "none"
+    assert len(s["unavailable"]) == 3
+    e = T.get_events(DbDownPlant(), "BFP2")
+    assert e["trend_6h"]["BFP2.VIB_DE"]["max"] == 3.3 and e["alerts"] == T.UNAVAILABLE and e["risk"] == T.UNAVAILABLE
+    r = T.get_recommendations(DbDownPlant(), "bearing_wear")
+    assert r["source"] == "docs/playbook/bearing_wear.md"  # local playbook fallback
