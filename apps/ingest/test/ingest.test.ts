@@ -137,9 +137,9 @@ describe("http surface", () => {
     await ingestOnce(testEnv(), fakeApi("2024-09-01T05:00:00").fetcher);
     const r = await SELF.fetch("http://ingest/health");
     expect(r.status).toBe(200);
-    const b = (await r.json()) as { last_ingested_hour: string; tags: number };
+    const b = (await r.json()) as { last_ingested_hour: string; sentinel_tag: string };
     expect(b.last_ingested_hour).toBe("2024-09-01T05:00:00");
-    expect(b.tags).toBe(TAGS.length);
+    expect(b.sentinel_tag).toBe("PLANT.LOAD");
   });
 
   it("manual trigger needs the admin token", async () => {

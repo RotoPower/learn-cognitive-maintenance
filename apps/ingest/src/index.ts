@@ -17,7 +17,7 @@
  * blew the read limit). When the clock is paused or clamped at the horizon, the
  * current hour is already stored and nothing is written.
  *
- * HTTP: GET /health (status, last ingested hour, tags in it) is open;
+ * HTTP: GET /health (status, last ingested hour of the sentinel tag) is open;
  * POST /ingest (manual trigger) needs the ADMIN token.
  */
 
@@ -36,6 +36,9 @@ export interface Env {
 }
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
+
+/** Written every sim hour (it is in every /tags/latest scan): the hour index for ingest. */
+export const SENTINEL = "PLANT.LOAD";
 
 /** Pick the transport: injected fetcher (tests) > service binding > global fetch. */
 function transport(env: Env, injected?: Fetcher): Fetcher {
@@ -94,8 +97,10 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
   const tags = Object.keys(latest.values);
 
   // Already stored (paused clock, clamped horizon, several crons per sim hour): skip the write.
-  const have = await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE ts = ?").bind(simHour).first<{ n: number }>();
-  const inserted = (have?.n ?? 0) >= tags.length
+  // The primary key (tag, ts) is the only index on readings (migration 0005): look hours up
+  // through the sentinel tag, which every pass writes.
+  const have = await env.DB.prepare("SELECT 1 AS n FROM readings WHERE tag = ? AND ts = ?").bind(SENTINEL, simHour).first<{ n: number }>();
+  const inserted = have
     ? 0
     : await upsert(env, tags.map((tag) => ({ tag, ts: simHour, value: latest.values[tag] })));
 
@@ -103,7 +108,7 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
   // very first run (empty table) seed the trailing INITIAL_BACKFILL_HOURS so dashboards
   // have a trend from day one.
   let backfilledHours = 0, backfilledRows = 0, skipped = 0;
-  const prev = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings WHERE ts < ?").bind(simHour).first<{ ts: string | null }>();
+  const prev = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings WHERE tag = ? AND ts < ?").bind(SENTINEL, simHour).first<{ ts: string | null }>();
   const maxHours = Number(env.MAX_BACKFILL_HOURS ?? 168);
   const gapHours = prev?.ts ? Math.round((ms(simHour) - ms(prev.ts)) / HOUR_MS) - 1 : Number(env.INITIAL_BACKFILL_HOURS ?? 168);
   {
@@ -146,9 +151,8 @@ export async function safeHealth(service: string, check: () => Promise<Response>
 
 async function health(env: Env): Promise<Response> {
   // Open endpoint: index-only queries, no full-table counts.
-  const last = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings").first<{ ts: string | null }>();
-  const tags = last?.ts ? await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE ts = ?").bind(last.ts).first<{ n: number }>() : null;
-  return Response.json({ service: "plant-ingest", last_ingested_hour: last?.ts ?? null, tags: tags?.n ?? 0, plant_api: env.PLANT_API_URL });
+  const last = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings WHERE tag = ?").bind(SENTINEL).first<{ ts: string | null }>();
+  return Response.json({ service: "plant-ingest", last_ingested_hour: last?.ts ?? null, sentinel_tag: SENTINEL, plant_api: env.PLANT_API_URL });
 }
 
 export default {

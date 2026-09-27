@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 PLANT_CLOCK_START = "2024-09-01T00:00:00"
-PLANT_CLOCK_SPEED = "60"
+PLANT_CLOCK_SPEED = "30"
 
 # Tokens are secrets: `wrangler secret put READ_TOKEN --env staging` (and ADMIN_TOKEN).
 # For local dev put them in .dev.vars (see .dev.vars.example).
@@ -29,7 +29,7 @@ migrations_dir = "migrations"
 # ---------------------------------------------------------------- staging
 [env.staging]
 name = "plant-api-staging"
-vars = { PLANT_CLOCK_START = "2024-09-01T00:00:00", PLANT_CLOCK_SPEED = "60" }
+vars = { PLANT_CLOCK_START = "2024-09-01T00:00:00", PLANT_CLOCK_SPEED = "30" }
 
 [[env.staging.durable_objects.bindings]]
 name = "CLOCK"

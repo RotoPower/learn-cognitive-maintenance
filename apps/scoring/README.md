@@ -24,12 +24,14 @@ Both scorers are ports of the Python code (`models/anomaly.py`, `models/predict/
 
 ## Cadence and D1 budget
 
-The cron is `0 * * * *`: at clock speed 60 one real hour is one sim day. A pass reads
-`LOOKBACK_DAYS` (60) of hourly readings per tag through the `(tag, ts)` primary key:
-24 tags x 1,440 h, about **35k rows read**, so 24 passes a day use ~830k of the free
-5M. A pass for a sim day already scored reads one row, so a paused or clamped clock is
-free. Writes are a few dozen rows per pass. Keep `POST /score?force=1` for demos: each
-forced pass costs another ~35k reads.
+The cron is `0 * * * *`: at clock speed 30 one real hour is half a sim day, so every
+other pass scores a new sim day. A pass reads `LOOKBACK_DAYS` (37) of hourly readings per
+tag through the `(tag, ts)` primary key: 82 tags x 888 h, about **73k rows read**. The
+37 days cover the anomaly baseline (30 days, 20-day minimum) plus the 7-day window and
+the predict model's 7-day slopes. At 24 passes a day, with half of them no-ops, that is
+~0.9-1.75M of the free 5M. A pass for a sim day already scored reads one row, so a paused
+or clamped clock is free. Writes are a few dozen rows per pass. Keep `POST /score?force=1`
+for demos: each forced pass costs another ~73k reads.
 
 ## Local
 
