@@ -16,7 +16,9 @@ from pathlib import Path
 from plant.sim import TAGS, Plant
 
 OUT = Path("apps/plant-api/test/fixtures/parity.json")
-HOURS = [0.0, 1.0, 17.0, 100.0, 1234.5, 3200.0, 4799.0, 4800.0, 5999.0, 6200.0, 6479.0, 6480.0, 6481.0, 7300.0, 7799.0, 7800.0, 8000.0, 8759.0]
+HOURS = [0.0, 1.0, 17.0, 100.0, 1234.5, 3200.0, 4799.0, 4800.0, 5999.0, 6200.0, 6479.0, 6480.0, 6481.0, 7300.0, 7799.0, 7800.0, 8000.0, 8759.0,
+         # full plant: inside each new failure window (TX1, CWP1, HRSG1 in 2024; the 2025 script), outages, horizon end
+         2000.0, 2800.0, 4000.0, 4700.0, 8420.0, 9500.0, 10500.0, 11900.0, 12650.0, 13900.0, 14600.0, 15500.0, 16200.0, 16600.0, 17543.0]
 
 
 def sample(plant: Plant) -> dict:

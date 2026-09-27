@@ -39,6 +39,16 @@ ASSET_INFO = {
     "BFP1": "Boiler feed pump A (duty), motor driven",
     "BFP2": "Boiler feed pump B (duty), motor driven",
     "CTF1": "Cooling tower fan cell 1, gearbox driven",
+    "GT2": "Gas turbine 2, 120 MW class",
+    "HRSG1": "Heat recovery steam generator 1",
+    "HRSG2": "Heat recovery steam generator 2",
+    "ST1": "Steam turbine, 55 MW class",
+    "BFP3": "Boiler feed pump C (standby), motor driven",
+    "CWP1": "Cooling water pump 1",
+    "CWP2": "Cooling water pump 2",
+    "CTF2": "Cooling tower fan cell 2, gearbox driven",
+    "GEN1": "Generator (block)",
+    "TX1": "Main step-up transformer",
 }
 
 # --------------------------------------------------------------------------- #

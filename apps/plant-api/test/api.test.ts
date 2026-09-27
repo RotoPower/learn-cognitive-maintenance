@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FAULTS } from "../src/faults";
-import { Plant } from "../src/sim";
+import { ASSETS, Plant, TAGS } from "../src/sim";
 
 const READ = { authorization: "Bearer r" };
 const ADMIN = { authorization: "Bearer a" };
@@ -38,18 +38,18 @@ describe("clock", () => {
     const c = (await (await get("/clock", READ)).json()) as { sim_time: string; speed: number; horizon_end: string };
     expect(c.sim_time).toBe("2024-09-01T00:00:00");
     expect(c.speed).toBe(0);
-    expect(c.horizon_end).toBe("2024-12-31T00:00:00");
+    expect(c.horizon_end).toBe("2026-01-01T00:00:00");
     // the running clock is clamped to the horizon end: jump to the end, run fast, still at the end
-    await post("/clock/jump", { to: "2024-12-31T00:00:00" }, ADMIN);
+    await post("/clock/jump", { to: "2026-01-01T00:00:00" }, ADMIN);
     await post("/clock/speed", { speed: 86_400 * 30 }, ADMIN);
     await new Promise((r) => setTimeout(r, 50));
     const end = (await (await get("/clock", READ)).json()) as { sim_time: string };
-    expect(end.sim_time).toBe("2024-12-31T00:00:00");
+    expect(end.sim_time).toBe("2026-01-01T00:00:00");
     const latest = (await (await get("/tags/latest?asset_id=GT1", READ)).json()) as { timestamp: string };
-    expect(latest.timestamp).toBe("2024-12-31T00:00:00");
+    expect(latest.timestamp).toBe("2026-01-01T00:00:00");
     // changing speed after running past the horizon re-anchors at the horizon end
     const stopped = (await (await post("/clock/speed", { speed: 0 }, ADMIN)).json()) as { sim_time: string };
-    expect(stopped.sim_time).toBe("2024-12-31T00:00:00");
+    expect(stopped.sim_time).toBe("2026-01-01T00:00:00");
     const j = await post("/clock/jump", { to: "2024-10-01T00:00" }, ADMIN);
     expect(((await j.json()) as { sim_time: string }).sim_time).toBe("2024-10-01T00:00:00");
     expect((await post("/clock/jump", { to: "2030-01-01T00:00" }, ADMIN)).status).toBe(422);
@@ -65,7 +65,8 @@ describe("plant routes", () => {
 
   it("assets", async () => {
     const a = (await (await get("/assets", READ)).json()) as { asset_id: string; tags: string[] }[];
-    expect(a.map((x) => x.asset_id)).toEqual(["GT1", "BFP1", "BFP2", "CTF1"]);
+    expect(a.map((x) => x.asset_id)).toEqual(ASSETS); // the original four first, then the full plant
+    expect(a.map((x) => x.asset_id).slice(0, 4)).toEqual(["GT1", "BFP1", "BFP2", "CTF1"]);
     expect(a[0].tags).toContain("GT1.EXH_TEMP");
   });
 
@@ -100,12 +101,15 @@ describe("plant routes", () => {
     expect(Object.keys(r.values).sort()).toEqual(["BFP2.BRG_TEMP_DE", "BFP2.DISCH_PRESS", "BFP2.FLOW", "BFP2.MOTOR_CURR", "BFP2.VIB_DE", "BFP2.VIB_NDE", "PLANT.LOAD"]);
     expect(r.values["BFP2.FLOW"]).toBeCloseTo(plant.value("BFP2", "FLOW", "2024-09-01T00:00:00"), 9);
     const all = (await (await get("/tags/latest", READ)).json()) as { values: Record<string, number> };
-    expect(Object.keys(all.values).length).toBe(1 + 7 + 6 + 6 + 4);
+    expect(Object.keys(all.values).length).toBe(1 + Object.values(TAGS).reduce((n, t) => n + Object.keys(t).length, 0));
+    expect(Object.keys(all.values).length).toBe(82);
     expect((await get("/tags/latest?asset_id=NOPE", READ)).status).toBe(404);
   });
 
   it("work orders persist in D1 and the log shows past repairs only", async () => {
-    expect(await (await get("/maintenance/log", READ)).json()).toEqual([]);
+    // at 2024-09-01 only the full plant's early-2024 repairs have happened
+    const early = (await (await get("/maintenance/log", READ)).json()) as { asset_id: string; timestamp: string }[];
+    expect(early.map((e) => [e.asset_id, e.timestamp])).toEqual([["CWP1", "2024-04-30T00:00:00"], ["TX1", "2024-06-19T00:00:00"], ["HRSG1", "2024-07-19T00:00:00"]]);
     const wo = await post("/maintenance/workorder", { asset_id: "bfp-2", type: "inspection", description: "vib check" }, READ);
     expect(wo.status).toBe(201);
     const w = (await wo.json()) as { id: string; asset_id: string; timestamp: string };
@@ -118,8 +122,9 @@ describe("plant routes", () => {
 
     await post("/clock/jump", { to: "2024-10-01T00:00" }, ADMIN);
     const later = (await (await get("/maintenance/log", READ)).json()) as { kind: string; asset_id: string; timestamp: string }[];
-    expect(later.map((e) => [e.kind, e.asset_id])).toEqual([["workorder", "BFP2"], ["corrective_repair", "BFP2"]]);
-    expect(later[1].timestamp).toBe("2024-09-27T00:00:00");
+    const recent = later.filter((e) => e.timestamp >= "2024-09-01");
+    expect(recent.map((e) => [e.kind, e.asset_id])).toEqual([["workorder", "BFP2"], ["corrective_repair", "BFP2"]]);
+    expect(recent[1].timestamp).toBe("2024-09-27T00:00:00");
     await post("/clock/jump", { to: "2024-09-01T00:00:00" }, ADMIN);
   });
 });
@@ -128,11 +133,12 @@ describe("admin", () => {
   it("ground truth (API and D1 mirror)", async () => {
     const gt = (await (await get("/admin/ground_truth", ADMIN)).json()) as { seed: number; failures: { asset: string }[]; health_now: Record<string, number> };
     expect(gt.seed).toBe(42);
-    expect(gt.failures.map((f) => f.asset)).toEqual(["BFP2", "GT1", "CTF1"]);
+    expect(gt.failures).toHaveLength(15);
+    expect(gt.failures.map((f) => f.asset)).toEqual(expect.arrayContaining(["BFP2", "GT1", "CTF1"]));
     expect(gt.health_now.BFP2).toBeLessThan(1); // 2024-09-01 is inside the BFP2 window
     expect(gt.health_now.GT1).toBe(1);
     const rows = await env.DB.prepare("SELECT kind, asset_id, mode FROM ground_truth ORDER BY id").all<{ kind: string; asset_id: string; mode: string }>();
-    expect(rows.results.length).toBe(4);
+    expect(rows.results.length).toBe(15 + 2); // failures + the BFP1 and HRSG2 outages
     expect(rows.results.filter((r: { kind: string }) => r.kind === "event")[0].asset_id).toBe("BFP1");
   });
 
@@ -216,8 +222,9 @@ describe("admin", () => {
     expect(b.seed).toBe(7);
     expect(b.sim_time).toBe("2024-09-01T00:00:00"); // configured PLANT_CLOCK_START
     const gt = (await (await get("/admin/ground_truth", ADMIN)).json()) as { failures: unknown[] };
-    expect(gt.failures.length).toBe(3);
-    expect(await (await get("/maintenance/log", READ)).json()).toEqual([]);
+    expect(gt.failures.length).toBe(15);
+    const logAfter = (await (await get("/maintenance/log", READ)).json()) as { kind: string }[];
+    expect(logAfter.every((e) => e.kind === "corrective_repair")).toBe(true); // work orders gone
     const p7 = Plant.fromConfig(DEFAULT_FAULTS, 7);
     const v = ((await (await get("/tags/GT1.EXH_TEMP/history?from=2024-03-01&to=2024-03-01", READ)).json()) as { points: { value: number }[] }).points[0].value;
     expect(v).toBeCloseTo(p7.value("GT1", "EXH_TEMP", "2024-03-01T00:00:00"), 9);
