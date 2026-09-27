@@ -170,6 +170,36 @@ describe("admin", () => {
     expect((await get("/playbook")).status).toBe(401);
   });
 
+  it("maintenance log hides work orders raised after sim now (a jump back)", async () => {
+    await post("/clock/speed", { speed: 0 }, ADMIN);
+    await post("/clock/jump", { to: "2024-10-05T00:00:00" }, ADMIN);
+    expect((await post("/maintenance/workorder", { asset_id: "CTF1", description: "oil sample" }, READ)).status).toBe(201);
+    const wos = async () => ((await (await get("/maintenance/log?asset_id=CTF1", READ)).json()) as { kind: string }[]).filter((e) => e.kind === "workorder");
+    expect(await wos()).toHaveLength(1);
+    await post("/clock/jump", { to: "2024-09-15T00:00:00" }, ADMIN);
+    expect(await wos()).toHaveLength(0);
+  });
+
+  it("alerts and predictions: read token, filtered by asset and window, never past sim now", async () => {
+    await post("/clock/speed", { speed: 0 }, ADMIN);
+    await post("/clock/jump", { to: "2024-09-01T00:00:00" }, ADMIN);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM alerts"), env.DB.prepare("DELETE FROM predictions"),
+      env.DB.prepare("INSERT INTO alerts(run_id, asset_id, tag, kind, first_flag_ts, last_flag_ts, severity, interpretation, status) VALUES ('r', 'BFP2', 'BFP2.VIB_DE', 'anomaly', '2024-08-25T00:00:00', '2024-08-28T00:00:00', 5.1, 'DE vibration rising', 'open'), ('r', 'GT1', 'GT1.CDP', 'anomaly', '2024-08-20T00:00:00', '2024-08-21T00:00:00', 3.4, 'CDP falling', 'resolved'), ('r', 'BFP2', 'BFP2.VIB_DE', 'anomaly', '2024-10-01T00:00:00', '2024-10-02T00:00:00', 4, 'future', 'open')"),
+      env.DB.prepare("INSERT INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES ('p1', 'BFP2', '2024-08-30T00:00:00', 0.9, 30, ?), ('p0', 'BFP2', '2024-08-29T00:00:00', 0.7, 30, '{}'), ('p9', 'BFP2', '2024-10-01T00:00:00', 0.1, 30, '{}')")
+        .bind(JSON.stringify({ drivers: [["VIB_DE__slope7d", 2.1]], interpretation: "consistent with bearing_wear (VIB_DE)", alert: true, threshold: 0.26 })),
+    ]);
+    expect((await get("/alerts")).status).toBe(401);
+    const all = (await (await get("/alerts", READ)).json()) as { tag: string }[];
+    expect(all.map((a) => a.tag)).toEqual(["BFP2.VIB_DE", "GT1.CDP"]); // the October row is in the sim future
+    const open = (await (await get("/alerts?asset_id=BFP-2&status=open&from=2024-08-26", READ)).json()) as { asset_id: string }[];
+    expect(open).toHaveLength(1);
+    const latest = (await (await get("/predictions?asset_id=BFP2&limit=1", READ)).json()) as Record<string, unknown>[];
+    expect(latest).toEqual([{ asset_id: "BFP2", as_of: "2024-08-30T00:00:00", p_fail: 0.9, horizon_days: 30, threshold: 0.26, alert: true,
+      drivers: ["VIB_DE__slope7d"], interpretation: "consistent with bearing_wear (VIB_DE)", artifact: null }]);
+    expect(((await (await get("/predictions?asset_id=BFP2", READ)).json()) as unknown[]).length).toBe(2);
+  });
+
   it("model artefacts round-trip through D1", async () => {
     const art = { run_id: "colab-a", seed: 42, model: { coefficients: [0.5] }, metrics: { auc: 0.9 }, meta: { task: "predict" } };
     expect((await post("/admin/model_artifacts", art, ADMIN)).status).toBe(201);

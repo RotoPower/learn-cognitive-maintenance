@@ -265,3 +265,16 @@ def test_model_artifacts(env, tmp_path) -> None:
     assert got.status_code == 200 and got.json()["model"]["params"] == {"n": 200}
     assert c.get("/admin/model_artifacts/nope", headers=ADMIN).status_code == 404
     assert c.get("/admin/model_artifacts/colab-2024-09-07-a", headers=READ).status_code == 403
+
+
+def test_maintenance_log_hides_work_orders_after_sim_now(env) -> None:
+    """Like repairs, work orders are history: a jump back hides the ones raised later."""
+    c, _, _ = env
+    c.post("/clock/speed", json={"speed": 0}, headers=ADMIN)
+    c.post("/clock/jump", json={"to": "2024-10-01T00:00"}, headers=ADMIN)
+    c.post("/maintenance/workorder", json={"asset_id": "GT1", "description": "wash"}, headers=READ)
+    wos = lambda: [e for e in c.get("/maintenance/log", headers=READ).json() if e["kind"] == "workorder"]
+    assert len(wos()) == 1
+    c.post("/clock/jump", json={"to": "2024-09-15T00:00"}, headers=ADMIN)
+    assert wos() == []
+    assert c.get("/alerts", headers=READ).json() == [] and c.get("/predictions?asset_id=BFP2", headers=READ).json() == []

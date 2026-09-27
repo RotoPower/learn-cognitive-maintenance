@@ -338,8 +338,8 @@ def create_app(
                         "description": f"Failure: {f['mode'].replace('_', ' ')}; component replaced",
                     }
                 )
-        for wo in st.workorders:
-            if asset is None or wo["asset_id"] == asset:
+        for wo in st.workorders:  # past only, like the repairs above
+            if (asset is None or wo["asset_id"] == asset) and wo["timestamp"] <= iso(now):
                 entries.append(wo)
         return sorted(entries, key=lambda e: e["timestamp"])
 
@@ -427,6 +427,20 @@ def create_app(
     @app.get("/playbook", dependencies=READ)
     def get_playbook(mode: str | None = None) -> dict[str, dict[str, str]]:
         return {m: s for m, s in sorted(st.playbook.items()) if mode is None or m == mode}
+
+    # Scoring (alerts, predictions) runs only in the Cloudflare scoring Worker; the local API
+    # keeps the routes so the assistant's client works against both, with no rows here.
+    @app.get("/alerts", dependencies=READ)
+    def alerts(asset_id: str | None = None, status: str | None = None) -> list[dict[str, Any]]:
+        if asset_id:
+            _resolve_asset(asset_id)
+        return []
+
+    @app.get("/predictions", dependencies=READ)
+    def predictions(asset_id: str | None = None) -> list[dict[str, Any]]:
+        if asset_id:
+            _resolve_asset(asset_id)
+        return []
 
     @app.get("/admin/model_artifacts/{run_id}", dependencies=ADMIN)
     def get_artifact(run_id: str) -> dict[str, Any]:

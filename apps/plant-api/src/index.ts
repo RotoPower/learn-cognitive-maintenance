@@ -9,6 +9,8 @@
  *   GET  /admin/ground_truth        ADMIN     POST /admin/inject_fault, /admin/reset
  *   GET  /admin/model_artifacts     ADMIN     POST /admin/model_artifacts
  *   GET  /playbook?mode=            READ      POST /admin/playbook             ADMIN
+ *   GET  /alerts?asset_id=&from=&to=&status=   READ   scoring outputs, never past sim now
+ *   GET  /predictions?asset_id=&from=&to=&limit=   READ
  *
  * State: the Clock Durable Object (clock + scenario overlay) and D1 (work orders,
  * artefacts, ground-truth mirror, assets). Readings are never stored here: they
@@ -149,7 +151,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
       routes: [
         "GET /clock", "POST /clock/speed", "POST /clock/jump", "GET /assets", "GET /tags/latest", "GET /tags/{tag}/history",
         "GET /maintenance/log", "POST /maintenance/workorder", "GET /admin/ground_truth", "POST /admin/inject_fault",
-        "POST /admin/reset", "GET /admin/model_artifacts", "POST /admin/model_artifacts", "GET /playbook", "POST /admin/playbook",
+        "POST /admin/reset", "GET /admin/model_artifacts", "POST /admin/model_artifacts", "GET /playbook", "POST /admin/playbook", "GET /alerts", "GET /predictions",
       ],
     });
   }
@@ -245,8 +247,9 @@ async function handle(req: Request, env: Env): Promise<Response> {
         entries.push({ kind: "corrective_repair", asset_id: f.asset, timestamp: f.repair, description: `Failure: ${f.mode.replace(/_/g, " ")}; component replaced` });
     }
     const rows = asset
-      ? await env.DB.prepare("SELECT * FROM maintenance_log WHERE kind='workorder' AND asset_id=? ORDER BY ts").bind(asset).all()
-      : await env.DB.prepare("SELECT * FROM maintenance_log WHERE kind='workorder' ORDER BY ts").all();
+      ? await env.DB.prepare("SELECT * FROM maintenance_log WHERE kind='workorder' AND asset_id=? AND ts <= ? ORDER BY ts").bind(asset, isoNaive(now)).all()
+      : await env.DB.prepare("SELECT * FROM maintenance_log WHERE kind='workorder' AND ts <= ? ORDER BY ts").bind(isoNaive(now)).all();
+    // Past only, like the repairs above: after a reset or a jump back, later work orders are hidden.
     for (const r of rows.results as Record<string, unknown>[])
       entries.push({ kind: "workorder", id: r.wo_id, asset_id: r.asset_id, type: r.type, description: r.description, timestamp: r.ts, scheduled_for: r.scheduled_for, status: r.status });
     entries.sort((x, y) => String(x.timestamp).localeCompare(String(y.timestamp)));
@@ -359,6 +362,35 @@ async function handle(req: Request, env: Env): Promise<Response> {
     const out: Record<string, Record<string, string>> = {};
     for (const r of rows.results) (out[r.mode] ??= {})[r.section] = r.body;
     return json(out);
+  }
+
+  // ----- scoring outputs (READ): the assistant's view of alerts and risk -----
+  if ((path === "/alerts" || path === "/predictions") && method === "GET") {
+    requireRead(req, env);
+    const { now } = await currentPlant(env);
+    const nowIso = isoNaive(now);
+    const assetParam = url.searchParams.get("asset_id");
+    const asset = assetParam ? resolveAsset(assetParam) : null;
+    const from = url.searchParams.get("from") ? isoNaive(parseTs(url.searchParams.get("from"), "from")) : "0000";
+    const toRaw = url.searchParams.get("to") ? isoNaive(parseTs(url.searchParams.get("to"), "to")) : nowIso;
+    const to = toRaw < nowIso ? toRaw : nowIso; // never past sim now (a reset or jump back leaves later rows behind)
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50) || 50, 1), 200);
+    if (path === "/alerts") {
+      const status = url.searchParams.get("status");
+      const where = ["first_flag_ts <= ?", "last_flag_ts >= ?", ...(asset ? ["asset_id = ?"] : []), ...(status ? ["status = ?"] : [])];
+      const binds = [to, from, ...(asset ? [asset] : []), ...(status ? [status] : [])];
+      const rows = await env.DB.prepare(`SELECT asset_id, tag, kind, first_flag_ts, last_flag_ts, severity, interpretation, status FROM alerts WHERE ${where.join(" AND ")} ORDER BY last_flag_ts DESC LIMIT ?`)
+        .bind(...binds, limit).all();
+      return json(rows.results);
+    }
+    const where = ["as_of >= ?", "as_of <= ?", ...(asset ? ["asset_id = ?"] : [])];
+    const rows = await env.DB.prepare(`SELECT asset_id, as_of, p_fail, horizon_days, drivers FROM predictions WHERE ${where.join(" AND ")} ORDER BY as_of DESC LIMIT ?`)
+      .bind(from, to, ...(asset ? [asset] : []), limit).all<{ asset_id: string; as_of: string; p_fail: number; horizon_days: number; drivers: string }>();
+    return json(rows.results.map((r) => {
+      const d = JSON.parse(r.drivers || "{}") as { drivers?: [string, number][]; interpretation?: string; alert?: boolean; threshold?: number; artifact?: string };
+      return { asset_id: r.asset_id, as_of: r.as_of, p_fail: r.p_fail, horizon_days: r.horizon_days, threshold: d.threshold ?? null,
+        alert: d.alert ?? null, drivers: (d.drivers ?? []).map(([n]) => n), interpretation: d.interpretation ?? null, artifact: d.artifact ?? null };
+    }));
   }
 
   const art = /^\/admin\/model_artifacts\/([^/]+)$/.exec(path);
