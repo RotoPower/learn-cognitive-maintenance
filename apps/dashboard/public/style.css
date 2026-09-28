@@ -121,6 +121,10 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid
 th { color: var(--muted); font-weight: 500; white-space: nowrap; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Long free text: keep a readable measure; on phones the table scrolls sideways instead of
+   squeezing this column to one word per line. */
+td.text { min-width: 240px; }
+.plain code { font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 12px; }
 .filter { display: inline-flex; gap: 8px; align-items: center; color: var(--ink-2); font-size: 13px; }
 select, input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); }
 .empty { color: var(--muted); padding: 10px 8px; }

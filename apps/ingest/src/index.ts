@@ -37,8 +37,9 @@ export interface Env {
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 
-/** Written every sim hour (it is in every /tags/latest scan): the hour index for ingest. */
-export const SENTINEL = "PLANT.LOAD";
+/** Written every sim hour (it is in every /tags/latest scan): the hour index for ingest.
+ * Not exported: workerd rejects any main-module export that is not a handler or class. */
+const SENTINEL = "PLANT.LOAD";
 
 /** Pick the transport: injected fetcher (tests) > service binding > global fetch. */
 function transport(env: Env, injected?: Fetcher): Fetcher {

@@ -1,7 +1,17 @@
 import { SELF, env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker, { ingestOnce } from "../src/index";
+import * as mainModule from "../src/index";
 import type { Env, Fetcher } from "../src/index";
+
+// workerd refuses to start a Worker whose main module exports anything but handlers or classes
+// (vitest and `wrangler deploy --dry-run` do not check this; `export const SENTINEL` slipped through).
+it("main module exports only handlers and functions", () => {
+  for (const [name, value] of Object.entries(mainModule)) {
+    if (name === "default") continue;
+    expect(typeof value, name).toBe("function");
+  }
+});
 
 const TAGS = ["PLANT.LOAD", "GT1.EXH_TEMP", "BFP1.FLOW", "BFP2.VIB_DE"];
 const HOUR = 3_600_000;

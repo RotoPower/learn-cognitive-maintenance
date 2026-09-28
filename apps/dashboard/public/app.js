@@ -3,6 +3,8 @@
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// Escape first, then **bold** and `code` only (chat answers and playbook lines).
+const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
 const STATUS = {
   healthy: { label: "Healthy", icon: "✓" },
   warning: { label: "Warning", icon: "!" },
@@ -107,11 +109,11 @@ function renderTables() {
   $("#alerts-table tbody").innerHTML = alerts.length
     ? alerts.map((a) => `<tr><td>${esc(a.asset_id)}</td><td><span class="tag-chip">${esc(a.tag || a.kind)}</span></td>
         <td class="when">${fmtTime(a.first_flag_ts)}</td><td class="when">${fmtTime(a.last_flag_ts)}</td>
-        <td class="num">${a.kind === "anomaly" ? Number(a.severity).toFixed(1) : pct(a.severity)}</td><td>${esc(a.interpretation)}</td></tr>`).join("")
+        <td class="num">${a.kind === "anomaly" ? Number(a.severity).toFixed(1) : pct(a.severity)}</td><td class="text">${esc(a.interpretation)}</td></tr>`).join("")
     : `<tr><td colspan="6" class="empty">No alerts${f ? ` for ${esc(f)}` : ""}.</td></tr>`;
   const wos = o.workorders.filter((w) => !f || w.asset_id === f);
   $("#wo-table tbody").innerHTML = wos.length
-    ? wos.map((w) => `<tr><td>${esc(w.id)}</td><td>${esc(w.asset_id)}</td><td>${esc(w.type)}</td><td class="when">${fmtTime(w.timestamp)}</td><td>${esc(w.status)}</td><td>${esc(w.description)}</td></tr>`).join("")
+    ? wos.map((w) => `<tr><td>${esc(w.id)}</td><td>${esc(w.asset_id)}</td><td>${esc(w.type)}</td><td class="when">${fmtTime(w.timestamp)}</td><td>${esc(w.status)}</td><td class="text">${esc(w.description)}</td></tr>`).join("")
     : `<tr><td colspan="6" class="empty">No work orders${f ? ` for ${esc(f)}` : ""}.</td></tr>`;
 }
 
@@ -155,7 +157,7 @@ function renderAsset(d) {
        ${p.drivers.length ? `<div class="muted">Top drivers: ${p.drivers.map(([n]) => `<span class="tag-chip">${esc(n)}</span>`).join(", ")}</div>` : ""}
        <div class="muted">Features as of ${fmtTime(p.as_of)}, alert threshold ${pct(p.threshold)}.</div></div>`
     : `<p class="muted">No risk score yet. Run scoring from the demo controls.</p>`;
-  const actions = `<ul class="plain">${d.actions.items.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+  const actions = `<ul class="plain">${d.actions.items.map((s) => `<li>${inline(s)}</li>`).join("")}</ul>
     <p class="muted">${d.actions.source === "playbook" ? `From the operator playbook: ${esc(d.mode.replace(/_/g, " "))}${d.modes?.length > 1 ? ` (this asset can also have ${esc(d.modes.filter((m) => m !== d.mode).join(", ").replace(/_/g, " "))})` : ""}.` : "Interim guidance for " + esc(d.mode.replace(/_/g, " ")) + "; the operator playbook replaces it in Part E."}</p>`;
   const wos = d.workorders.length
     ? `<ul class="plain">${d.workorders.map((w) => `<li>${esc(w.id)} · ${esc(w.type)} · ${fmtTime(w.timestamp)} · ${esc(w.status)}${w.description ? ` — ${esc(w.description)}` : ""}</li>`).join("")}</ul>`
@@ -368,7 +370,6 @@ function sessionId() {
 
 // Escape first, then a small safe subset of Markdown: paragraphs, bullets, **bold**, `code`.
 function renderMarkdown(src) {
-  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
   const out = [];
   let list = null;
   for (const line of src.split("\n")) {
