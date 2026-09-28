@@ -48,3 +48,19 @@ def test_dry_run_checks_locally_and_calls_nothing(monkeypatch, capsys):
         assert "[6/6] read /api/overview" in out
     else:
         assert code == 3 and "npm install" in out
+
+
+def test_step1_refuses_a_bulk_delete_without_the_flag(monkeypatch):
+    calls = []
+
+    def fake_sql(sql):
+        calls.append(sql)
+        return [{"n": 1_391_328}] if sql.startswith("SELECT") else []
+
+    monkeypatch.setattr(P, "wrangler_sql", fake_sql)
+    with pytest.raises(SystemExit, match="refusing: deleting 1391328 rows"):
+        P.step1_delete_junk({})
+    assert not any(s.startswith("DELETE") for s in calls)
+    calls.clear()
+    P.step1_delete_junk({"allow_bulk_delete": True})
+    assert any(s.startswith("DELETE") for s in calls)

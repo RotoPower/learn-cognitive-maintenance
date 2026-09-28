@@ -42,6 +42,8 @@ HORIZON_END = "2024-12-31T00:00:00"  # main's horizon; the full plant's is 2025-
 ALLOWED_MIGRATIONS = {"0002_scoring_indexes.sql", "0003_dashboard.sql", "0004_assistant.sql"}
 ARTIFACT = ROOT / "models" / "artifacts" / "predict_fleet_h30_2024-01-01_s42_sym7.json"
 WORKTREE = Path(tempfile.gettempdir()) / "lcm-phase0-main"
+# D1 free tier: 100k rows written per day, and a DELETE writes one row per deleted row.
+MAX_DELETE = 50_000
 NPX = "npx.cmd" if os.name == "nt" else "npx"
 PLANT_API_DIR = ROOT / "apps" / "plant-api"
 
@@ -107,6 +109,9 @@ def step1_delete_junk(ctx) -> None:
     where = f"ts > '{HORIZON_END}'"
     n = wrangler_sql(f"SELECT COUNT(*) AS n FROM readings WHERE {where}")[0]["n"]  # ix_readings_ts: reads only those rows
     print(f"  {n} readings past {HORIZON_END}")
+    if n > MAX_DELETE and not ctx.get("allow_bulk_delete"):
+        raise SystemExit(f"refusing: deleting {n} rows writes {n} rows (daily free limit 100k); "
+                         "rerun with --allow-bulk-delete to accept, or delete in batches over several days")
     if n:
         wrangler_sql(f"DELETE FROM readings WHERE {where}")
         print(f"  deleted; left: {wrangler_sql(f'SELECT COUNT(*) AS n FROM readings WHERE {where}')[0]['n']}")
@@ -179,6 +184,7 @@ STEPS = [step1_delete_junk, step2_migrations, step3_artifact, step4_playbook, st
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--dry-run", action="store_true", help="local checks and the plan only")
+    p.add_argument("--allow-bulk-delete", action="store_true", help=f"step 1 may delete more than {MAX_DELETE} rows")
     p.add_argument("--from", dest="start", type=int, default=1, choices=range(1, len(STEPS) + 1))
     a = p.parse_args(argv)
     _load_dotenv()
@@ -207,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.dry_run:
             continue
         try:
-            fn({"api": api.rstrip("/"), "token": token})
+            fn({"api": api.rstrip("/"), "token": token, "allow_bulk_delete": a.allow_bulk_delete})
         except ApiError as e:
             print(f"  plant API error: {e}")
             print(f"  fix it and resume with --from {i}")
