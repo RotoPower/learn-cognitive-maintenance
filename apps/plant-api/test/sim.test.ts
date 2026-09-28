@@ -106,7 +106,7 @@ describe("ported sim tests", () => {
         expect(Math.abs(delta)).toBeGreaterThan(0.4 * Math.abs(gain));
       }
     }
-  });
+  }, 30_000); // 15 scripted failures over two years: ~5 s on a CI runner, past the 5 s default
 
   it("dead tag is constant, outage is NaN", () => {
     expect(plant.value("GT1", "BRG_TEMP_2", 5)).toBe(81.4);
