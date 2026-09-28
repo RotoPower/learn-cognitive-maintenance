@@ -8,7 +8,7 @@ subagent and Slack reports are **on hold**.
 |---|---|---|
 | 0 | Staging after the D1 reset: junk rows deleted, migrations 0002-0004, GO predict artefact, playbook loaded, one scoring pass, Colab round-trip (D2.3); **10-minute demo rehearsed**; Checkpoints D and E | the demo runs end to end on staging, chat included |
 | 1 | **Full plant**: 14 assets, 8 failure modes, 2 years (design: `docs/design/full-plant.md`); simulator + TypeScript parity, docs/plant.md, maintenance-domain skill, 5 new playbooks, dashboard for 14 assets, D1 budget redesign | staging shows 14 assets; the 2024 numbers of the 4 original assets are unchanged |
-| 2 | **`assistant-evaluator`** subagent: re-scores the golden set after every model or prompt change, called from `/run`; golden set extended to the new modes | a model change cannot ship without a golden-set score |
+| 2 | **`assistant-evaluator`** subagent: re-scores the golden set after every model or prompt change, called from `/pipeline`; golden set extended to the new modes | a model change cannot ship without a golden-set score |
 | 3 | **Models**: anomaly and predict for the new modes (re-validated), **RUL** and **forecast** skills and models, NASA C-MAPSS benchmark for the GT class (Colab) | validator GO on each; the dashboard shows remaining useful life |
 | 4 | **Assistant without the PC**: `apps/assistant-cf` on Workers AI (free) with the same four tool schemas, used when the PC tunnel is off; semantic search (Vectorize + Workers AI embeddings) over playbooks and work orders | the chat answers outside demo sessions; its golden-set score is measured and shown |
 | 5 | **Data lake**: monthly readings to R2 as parquet, DuckDB for the `data` agent | D1 holds only the recent window |

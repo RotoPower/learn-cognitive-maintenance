@@ -63,7 +63,16 @@ elif tool in ("Bash", "PowerShell"):
         )
         if re.search(r"python|uv\s+run|\bpy\s", cmd, re.I) and py_writers.search(cmd):
             block(f"python command writes near data/raw: {cmd}")
-        if re.search(r"Set-Content|Add-Content|Out-File|Remove-Item|New-Item|Move-Item|Copy-Item", cmd, re.I):
+        ps_writers = re.compile(
+            r"Set-Content|Add-Content|Clear-Content|Out-File|Remove-Item|New-Item|Move-Item|Copy-Item|"
+            r"Rename-Item|Set-ItemProperty|Export-(Csv|Clixml)|Expand-Archive|Compress-Archive|"
+            r"Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|-OutFile|"
+            r"\[(System\.)?IO\.(File|Directory)\]::(Write|Append|Create|Delete|Move|Copy|Replace|Open)|"
+            # aliases, only in command position so e.g. "--copy" or "desc" do not match
+            r"(^|[;&|(]|\s)(ni|ri|del|erase|rd|mi|move|cpi|copy|sc|ac|clc|ren|rni|iwr|irm|epcsv)(\s|$)",
+            re.I,
+        )
+        if ps_writers.search(cmd):
             block(f"PowerShell command mutates data/raw: {cmd}")
 
 sys.exit(0)

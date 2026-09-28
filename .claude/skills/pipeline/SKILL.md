@@ -1,5 +1,5 @@
 ---
-description: Full maintenance workflow for /run <anomaly|predict> <asset|fleet> <horizon>. Use only when invoked by the user.
+description: Full maintenance workflow for /pipeline <anomaly|predict> <asset|fleet> <horizon>. Use only when invoked by the user.
 disable-model-invocation: true
 ---
 1. FRAME — restate question, metric, sim-time window. Wait for approval.

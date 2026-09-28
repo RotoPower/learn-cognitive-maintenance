@@ -1,4 +1,4 @@
-"""scripts/block-prod-deploy.sh: production deploys are blocked unless a human approved HEAD."""
+"""Hook scripts: block-prod-deploy.sh, guard-ground-truth.sh, guard-raw-data.sh."""
 
 from __future__ import annotations
 
@@ -11,8 +11,22 @@ from pathlib import Path
 import pytest
 
 HOOK = Path(__file__).resolve().parents[1] / "scripts" / "block-prod-deploy.sh"
-# Full path: on Windows, subprocess would otherwise pick System32's WSL bash.exe before Git Bash.
-BASH = shutil.which("bash") or "bash"
+
+
+def _git_bash() -> str:
+    # Full path: on Windows, subprocess would otherwise pick System32's WSL bash.exe before Git Bash
+    # (always the case when pytest runs from PowerShell, where every hook call exits 127).
+    found = shutil.which("bash") or "bash"
+    if os.name == "nt" and "system32" in found.lower():
+        git = shutil.which("git")
+        if git:
+            candidate = Path(git).resolve().parents[1] / "bin" / "bash.exe"  # <Git>/cmd/git.exe -> <Git>/bin/bash.exe
+            if candidate.exists():
+                return str(candidate)
+    return found
+
+
+BASH = _git_bash()
 
 
 @pytest.fixture
@@ -165,3 +179,64 @@ def test_ground_truth_is_blocked(payload: dict) -> None:
 )
 def test_normal_data_work_passes(payload: dict) -> None:
     assert run_gt(payload) == 0
+
+
+# ------------------------------------------------ scripts/guard-raw-data.sh (project-wide)
+
+RAW_HOOK = HOOK.parent / "guard-raw-data.sh"
+
+
+def run_raw(payload: dict) -> int:
+    p = subprocess.run([BASH, str(RAW_HOOK)], input=json.dumps(payload), capture_output=True, text=True, timeout=60)
+    return p.returncode
+
+
+def ps(cmd: str) -> dict:
+    return bash(cmd, tool="PowerShell")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"tool_name": "Write", "tool_input": {"file_path": "E:/x/data/raw/2024-09.parquet"}},
+        {"tool_name": "Edit", "tool_input": {"file_path": "data\\raw\\notes.md"}},
+        bash("rm data/raw/2024-07.parquet"),
+        bash("echo x > data/raw/x.csv"),
+        bash("sed -i 's/a/b/' data/raw/x.csv"),
+        bash("uv run python -c \"import pandas as pd; pd.DataFrame().to_parquet('data/raw/x.parquet')\""),
+        ps("Set-Content -Path data/raw/x.csv -Value 1"),
+        ps("Remove-Item -Recurse data\\raw\\2024-07"),
+        ps("Rename-Item data/raw/a.parquet b.parquet"),
+        ps("Clear-Content data/raw/x.csv"),
+        ps("Get-Process | Export-Csv data/raw/p.csv"),
+        ps("Expand-Archive dump.zip -DestinationPath data/raw"),
+        ps("Invoke-WebRequest https://example.com/x.parquet -OutFile data/raw/x.parquet"),
+        ps("[IO.File]::WriteAllText('data/raw/x.csv', 'a')"),
+        ps("[System.IO.File]::Delete('data/raw/x.csv')"),
+        ps("del data/raw/x.csv"),
+        ps("ni data/raw/new.csv"),
+        ps("Get-Content a.csv | sc data/raw/a.csv"),
+        ps("ren data/raw/a.csv b.csv"),
+        ps("copy data/derived/a.parquet data/raw/"),
+    ],
+)
+def test_raw_writes_are_blocked(payload: dict) -> None:
+    assert run_raw(payload) == 2
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"tool_name": "Read", "tool_input": {"file_path": "data/raw/2024-07.parquet"}},
+        {"tool_name": "Write", "tool_input": {"file_path": "data/derived/features.parquet"}},
+        bash("ls data/raw"),
+        bash("uv run python -c \"import pandas as pd; print(pd.read_parquet('data/raw/2024-07.parquet').shape)\""),
+        ps("Get-ChildItem data/raw"),
+        ps("Get-Content data/raw/manifest.json | ConvertFrom-Json"),
+        ps("Get-ChildItem data/raw -Recurse | Measure-Object -Property Length -Sum"),
+        ps("Remove-Item data/derived/old.parquet"),
+        ps("git diff --stat -- data/raw"),
+    ],
+)
+def test_raw_reads_and_other_writes_pass(payload: dict) -> None:
+    assert run_raw(payload) == 0

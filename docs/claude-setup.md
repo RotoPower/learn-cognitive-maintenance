@@ -13,7 +13,7 @@ has a seed and a run id.
 | `/eda` | skill | profile a dataset, write a findings report | - |
 | `maintenance-domain` | skill (preloaded) | tags, units, baselines, failure modes and their symptoms | - |
 | `/anomaly`, `/predict` | skills | the method for each model task | - |
-| `/run <task> <target> <horizon>` | skill, user-invoked only | frame -> data -> model -> validate -> ask -> deploy staging | run a step out of order or skip the validator |
+| `/pipeline <task> <target> <horizon>` | skill, user-invoked only | frame -> data -> model -> validate -> ask -> deploy staging | run a step out of order or skip the validator |
 | `data` | subagent | profiles and prepares `data/derived` tables from sensors and the CMMS log | read ground truth or `plant/faults*.yaml`; write `data/raw` |
 | `modeler` | subagent, worktree | writes model code, prepares Colab runs, scores via the CLIs | call the plant API, deploy, read ground truth |
 | `validator` | subagent | adversarial GO / NO-GO: leakage, time split, metrics recomputed against ground truth | edit files |
@@ -87,7 +87,7 @@ for a minute. BFP2's scripted bearing wear starts at day 240; it fails on day 27
    press Confirm on the card).
 5. **Reveal ground truth**: `uv run plantctl --admin ground-truth` (validator-only in the dev
    team): the failure was scripted for day 270, so the warning came about two weeks early.
-6. **Claude Code**: show `/run anomaly fleet 7d` walking steps 2-3 with the subagents, and the
+6. **Claude Code**: show `/pipeline anomaly fleet 7d` walking steps 2-3 with the subagents, and the
    hooks refusing a production deploy and a ground-truth read.
 
 If staging's D1 is over its free daily limit, every data route says so (503 with the reason);
