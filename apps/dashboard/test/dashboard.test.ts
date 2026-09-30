@@ -17,11 +17,11 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM demo_actions"), env.DB.prepare("DELETE FROM maintenance_log"),
     env.DB.prepare("DELETE FROM alerts"), env.DB.prepare("DELETE FROM predictions"), env.DB.prepare("DELETE FROM runs"),
   ]);
-  const drivers = (d: [string, number][], interp: string) => JSON.stringify({ drivers: d, interpretation: interp, alert: false, threshold: 0.256, artifact: "predict_fleet_h30_2024-10-15_s42" });
+  const drivers = (d: [string, number][], interp: string, alert = false) => JSON.stringify({ drivers: d, interpretation: interp, alert, threshold: 0.256, artifact: "predict_fleet_h30_2024-10-15_s42" });
   await env.DB.batch([
     env.DB.prepare("INSERT INTO runs(run_id, task, as_of, artifact, started, finished) VALUES ('score_2024-09-20_predict', 'predict', '2024-09-20T13:00:00', 'p', 'x', 'y'), ('score_2024-09-20_anomaly', 'anomaly', '2024-09-20T13:00:00', 'a', 'x', 'y'), ('score_2024-10-30_predict', 'predict', '2024-10-30T00:00:00', 'p', 'x', 'y')"),
     env.DB.prepare("INSERT INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES (?, 'BFP2', '2024-09-20T00:00:00', 0.97, 30, ?), (?, 'GT1', '2024-09-20T00:00:00', 0.01, 30, ?), ('score_2024-10-30_predict', 'BFP2', '2024-10-30T00:00:00', 0.5, 30, '{}')")
-      .bind("score_2024-09-20_predict", drivers([["VIB_DE__slope30d", 54]], "consistent with bearing_wear (VIB_DE)"), "score_2024-09-20_predict", drivers([], "")),
+      .bind("score_2024-09-20_predict", drivers([["VIB_DE__slope30d", 54]], "consistent with bearing_wear (VIB_DE)", true), "score_2024-09-20_predict", drivers([], "")),
     env.DB.prepare("INSERT INTO alerts(run_id, asset_id, tag, kind, first_flag_ts, last_flag_ts, severity, interpretation) VALUES ('r', 'BFP2', 'BFP2.VIB_DE', 'anomaly', '2024-09-15T00:00:00', '2024-09-19T12:00:00', 6.4, 'DE vibration rising'), ('r', 'BFP2', 'BFP2.BRG_TEMP_DE', 'anomaly', '2024-09-16T00:00:00', '2024-09-19T00:00:00', 4.1, 'DE bearing temperature rising'), ('r', 'CTF1', 'CTF1.VIB', 'anomaly', '2024-11-10T00:00:00', '2024-11-12T00:00:00', 5, 'future: must not show')"),
   ]);
 });
@@ -53,6 +53,14 @@ describe("GET /api/overview", () => {
     const byId = Object.fromEntries(o.assets.map((a: { asset_id: string }) => [a.asset_id, a]));
     expect(byId.BFP1).toMatchObject({ status: "critical", top_driver: "VIB_DE__slope7d", top_driver_source: "risk model" });
     expect(byId.CTF1.status).toBe("warning");
+  });
+
+  it("one day above the threshold without the persistence alert is yellow, not red", async () => {
+    await env.DB.prepare("INSERT OR REPLACE INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES ('score_2024-09-20_predict', 'CTF1', '2024-09-20T00:00:00', 0.3, 30, ?)")
+      .bind(JSON.stringify({ drivers: [["CTF1.X", 1]], threshold: 0.256, alert: false })).run();
+    const o = JSON.parse(await text(await api("/api/overview")));
+    const ctf = o.assets.find((x: { asset_id: string }) => x.asset_id === "CTF1");
+    expect(ctf).toMatchObject({ status: "warning", risk_alert: false, top_driver: null });
   });
 });
 

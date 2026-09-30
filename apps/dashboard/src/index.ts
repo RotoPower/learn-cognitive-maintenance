@@ -157,9 +157,9 @@ const WARN_FRACTION = 0.75;
 
 type Status = "healthy" | "warning" | "critical";
 
-function assetStatus(asset: string, alerts: AlertRow[], pred: { p: number; threshold: number } | null, now: number, trusted: boolean): Status {
+function assetStatus(asset: string, alerts: AlertRow[], pred: { p: number; threshold: number; alert: boolean } | null, now: number, trusted: boolean): Status {
   const active = alerts.filter((a) => a.asset_id === asset && a.kind === "anomaly" && a.status === "open" && ms(a.last_flag_ts) >= now - 7 * DAY_MS);
-  if (active.some((a) => a.severity >= 6) || (trusted && pred && pred.p >= pred.threshold)) return "critical";
+  if (active.some((a) => a.severity >= 6) || (trusted && pred && pred.alert)) return "critical";
   if (active.length > 0 || (trusted && pred && pred.p >= pred.threshold * WARN_FRACTION)) return "warning";
   return "healthy";
 }
@@ -174,8 +174,14 @@ async function latestPredictions(env: Env, simNow: string): Promise<{ run_id: st
 }
 
 function parseDrivers(p: PredictionRow) {
-  const d = JSON.parse(p.drivers || "{}") as { drivers?: [string, number][]; interpretation?: string; threshold?: number; artifact?: string };
-  return { drivers: d.drivers ?? [], interpretation: d.interpretation ?? "", threshold: d.threshold ?? 0.5, artifact: d.artifact ?? null };
+  const d = JSON.parse(p.drivers || "{}") as { drivers?: [string, number][]; interpretation?: string; threshold?: number; artifact?: string; alert?: boolean };
+  return { drivers: d.drivers ?? [], interpretation: d.interpretation ?? "", threshold: d.threshold ?? 0.5, artifact: d.artifact ?? null, alert: d.alert ?? null };
+}
+
+// The validated alert needs `persistence` consecutive daily scores >= threshold; scoring stores the verdict in
+// `drivers.alert`. One day above the threshold is only yellow. Rows without it (older runs) fall back to one day.
+function riskAlert(p: number, d: { threshold: number; alert: boolean | null }): boolean {
+  return d.alert ?? p >= d.threshold;
 }
 
 export async function overview(env: Env) {
@@ -199,7 +205,7 @@ export async function overview(env: Env) {
     const board = known.map((a) => {
       const pr = preds.rows.find((r) => r.asset_id === a.asset_id);
       const d = pr ? parseDrivers(pr) : null;
-      const status = assetStatus(a.asset_id, alerts, pr && d ? { p: pr.p_fail, threshold: d.threshold } : null, now, trusted);
+      const status = assetStatus(a.asset_id, alerts, pr && d ? { p: pr.p_fail, threshold: d.threshold, alert: riskAlert(pr.p_fail, d) } : null, now, trusted);
       const top = alerts
         .filter((x) => x.asset_id === a.asset_id && x.kind === "anomaly" && x.status === "open" && ms(x.last_flag_ts) >= now - 7 * DAY_MS)
         .sort((x, y) => y.severity - x.severity)[0];
@@ -212,11 +218,11 @@ export async function overview(env: Env) {
         modes: ASSET_MODES[a.asset_id],
         status,
         risk: pr ? pr.p_fail : null,
-        risk_alert: pr && d ? pr.p_fail >= d.threshold : false,
-        // A model driver is shown only for an asset above the risk threshold: below it the
+        risk_alert: pr && d ? riskAlert(pr.p_fail, d) : false,
+        // A model driver is shown only for an asset on a risk alert: below it the
         // top contribution is noise (often hours_since_repair, a known clock proxy).
-        top_driver: top?.tag ?? (pr && d && pr.p_fail >= d.threshold ? d.drivers[0]?.[0] ?? null : null),
-        top_driver_source: top ? "anomaly" : pr && d && pr.p_fail >= d.threshold && d.drivers.length ? "risk model" : null,
+        top_driver: top?.tag ?? (pr && d && riskAlert(pr.p_fail, d) ? d.drivers[0]?.[0] ?? null : null),
+        top_driver_source: top ? "anomaly" : pr && d && riskAlert(pr.p_fail, d) && d.drivers.length ? "risk model" : null,
         days_since_maintenance: lastMaint ? Math.floor((now - ms(lastMaint)) / DAY_MS) : null,
         open_alerts: alerts.filter((x) => x.asset_id === a.asset_id && x.status === "open").length,
       };
