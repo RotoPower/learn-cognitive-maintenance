@@ -151,12 +151,16 @@ const FALLBACK_ACTIONS: Record<string, string[]> = {
 interface AlertRow { id: number; asset_id: string; tag: string | null; kind: string; first_flag_ts: string; last_flag_ts: string; severity: number; interpretation: string | null; status: string }
 interface PredictionRow { asset_id: string; as_of: string; p_fail: number; horizon_days: number; drivers: string }
 
+// Yellow from 0.75 x threshold (validator GO 2026-10-01: healthy days 22% -> 2.6% yellow, CTF1 60% -> 10%;
+// chosen looking at 2024, 2025 holdout agrees). Display only: the alert rule is unchanged.
+const WARN_FRACTION = 0.75;
+
 type Status = "healthy" | "warning" | "critical";
 
 function assetStatus(asset: string, alerts: AlertRow[], pred: { p: number; threshold: number } | null, now: number, trusted: boolean): Status {
   const active = alerts.filter((a) => a.asset_id === asset && a.kind === "anomaly" && a.status === "open" && ms(a.last_flag_ts) >= now - 7 * DAY_MS);
   if (active.some((a) => a.severity >= 6) || (trusted && pred && pred.p >= pred.threshold)) return "critical";
-  if (active.length > 0 || (trusted && pred && pred.p >= pred.threshold / 2)) return "warning";
+  if (active.length > 0 || (trusted && pred && pred.p >= pred.threshold * WARN_FRACTION)) return "warning";
   return "healthy";
 }
 

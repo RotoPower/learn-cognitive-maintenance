@@ -46,9 +46,9 @@ describe("GET /api/overview", () => {
     expect(o.alerts.map((a: { tag: string }) => a.tag)).not.toContain("CTF1.VIB");
   });
 
-  it("with a trusted model, risk alone sets status: above threshold is critical, above half of it a warning", async () => {
-    await env.DB.prepare("INSERT INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES ('score_2024-09-20_predict', 'BFP1', '2024-09-20T00:00:00', 0.3, 30, ?), ('score_2024-09-20_predict', 'CTF1', '2024-09-20T00:00:00', 0.15, 30, ?)")
-      .bind(JSON.stringify({ drivers: [["VIB_DE__slope7d", 1]], threshold: 0.256 }), JSON.stringify({ drivers: [], threshold: 0.256 })).run();
+  it("with a trusted model, risk alone sets status: above threshold is critical, above 0.75 of it a warning, below that healthy", async () => {
+    await env.DB.prepare("INSERT OR REPLACE INTO predictions(run_id, asset_id, as_of, p_fail, horizon_days, drivers) VALUES ('score_2024-09-20_predict', 'BFP1', '2024-09-20T00:00:00', 0.3, 30, ?), ('score_2024-09-20_predict', 'CTF1', '2024-09-20T00:00:00', 0.2, 30, ?), ('score_2024-09-20_predict', 'GT1', '2024-09-20T00:00:00', 0.15, 30, ?)")
+      .bind(JSON.stringify({ drivers: [["VIB_DE__slope7d", 1]], threshold: 0.256 }), JSON.stringify({ drivers: [], threshold: 0.256 }), JSON.stringify({ drivers: [], threshold: 0.256 })).run();
     const o = JSON.parse(await text(await api("/api/overview")));
     const byId = Object.fromEntries(o.assets.map((a: { asset_id: string }) => [a.asset_id, a]));
     expect(byId.BFP1).toMatchObject({ status: "critical", top_driver: "VIB_DE__slope7d", top_driver_source: "risk model" });
