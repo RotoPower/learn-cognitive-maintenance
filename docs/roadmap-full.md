@@ -17,7 +17,7 @@ subagent and Slack reports are **on hold**.
 Free-tier constraints that shape the plan:
 
 - **D1 writes (100k rows/day).** 82 tags at clock speed 60 would write ~118k rows/day even without the
-  readings index. Phase 1 drops `ix_readings_ts` and runs staging at speed 30 (see the design doc).
+  readings index. Phase 1 drops `ix_readings_ts` and pauses the staging clock between demos (see the design doc, section 5).
 - **Worker size (3 MB free).** `onnxruntime-web` does not fit; tree models from Phase 3 are exported to
   JSON and evaluated in plain JS, like the logistic model today.
 - **Workers AI (daily free allocation)** covers a demo's fallback-chat and embedding traffic; quality is

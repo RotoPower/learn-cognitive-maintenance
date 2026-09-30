@@ -37,9 +37,11 @@ export interface Env {
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 
-/** Written every sim hour (it is in every /tags/latest scan): the hour index for ingest.
+/** The hour index for ingest: an hour is stored once this tag's row exists. It is written last in
+ * every pass, so a pass that fails halfway leaves the hour unmarked. It is a full-plant tag (not
+ * PLANT.LOAD): hours stored by the 4-asset plant carry no sentinel and are rewritten with all tags.
  * Not exported: workerd rejects any main-module export that is not a handler or class. */
-const SENTINEL = "PLANT.LOAD";
+const SENTINEL = "TX1.MOISTURE_PPM";
 
 /** Pick the transport: injected fetcher (tests) > service binding > global fetch. */
 function transport(env: Env, injected?: Fetcher): Fetcher {
@@ -82,6 +84,7 @@ async function api<T>(env: Env, fetcher: Fetcher, path: string): Promise<T> {
 
 async function upsert(env: Env, rows: { tag: string; ts: string; value: number | null }[]): Promise<number> {
   if (rows.length === 0) return 0;
+  rows = [...rows.filter((r) => r.tag !== SENTINEL), ...rows.filter((r) => r.tag === SENTINEL)];
   const stmt = env.DB.prepare("INSERT OR REPLACE INTO readings(tag, ts, value) VALUES (?, ?, ?)");
   // D1 batches are transactional and accept many statements; chunk to stay well under limits.
   for (let i = 0; i < rows.length; i += 100) {
@@ -96,6 +99,8 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
   const latest = await api<Latest>(env, fetcher, "/tags/latest");
   const simHour = latest.timestamp;
   const tags = Object.keys(latest.values);
+  // Without the sentinel every pass would look like a gap and rewrite a week of rows.
+  if (!tags.includes(SENTINEL)) throw new Error(`plant API /tags/latest has no ${SENTINEL}: is it the full-plant build?`);
 
   // Already stored (paused clock, clamped horizon, several crons per sim hour): skip the write.
   // The primary key (tag, ts) is the only index on readings (migration 0005): look hours up

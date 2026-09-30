@@ -28,7 +28,8 @@ Both scorers are ports of the Python code (`models/anomaly.py`, `models/predict/
 ## Cadence and D1 budget
 
 The cron is `0 * * * *`: at clock speed 30 one real hour is half a sim day, so every
-other pass scores a new sim day. A pass reads `LOOKBACK_DAYS` (37) of hourly readings per
+other pass scores a new sim day. Staging runs the clock paused (demo jumps only), so a cron
+pass scores only after a jump has moved the clock to an unscored sim day. A pass reads `LOOKBACK_DAYS` (37) of hourly readings per
 tag through the `(tag, ts)` primary key: 82 tags x 888 h, about **73k rows read**. The
 37 days cover the anomaly baseline (30 days, 20-day minimum) plus the 7-day window and
 the predict model's 7-day slopes. At 24 passes a day, with half of them no-ops, that is

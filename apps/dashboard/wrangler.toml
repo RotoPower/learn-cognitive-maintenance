@@ -15,9 +15,10 @@ PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
 SCORING_URL = "http://127.0.0.1:8789"         # wrangler dev of apps/scoring
 PREDICT_TRUSTED = "on"                        # validator GO (2026-09-27): risk sets status too
 CACHE_SECONDS = "30"
-DEMO_PER_VIEWER_HOUR = "5"
+DEMO_PER_VIEWER_HOUR = "10"                   # the scripted demo needs 7 (5 jumps + 2 scoring runs)
 DEMO_GLOBAL_HOUR = "60"
 SCORE_GLOBAL_DAY = "30"
+JUMP_NEW_GLOBAL_DAY = "6"                     # jumps into unstored weeks: 6 x ~13.8k = 83k of 100k D1 writes/day
 WORKORDER_PER_VIEWER_HOUR = "10"
 
 # Secrets: READ_TOKEN, ADMIN_TOKEN (plant API), SCORING_ADMIN_TOKEN (scoring POST /score;
@@ -37,7 +38,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 # ---------------------------------------------------------------- staging
 [env.staging]
 name = "plant-dashboard-staging"
-vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", SCORING_URL = "https://plant-scoring-staging.rotopower.workers.dev", PREDICT_TRUSTED = "on", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "5", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", WORKORDER_PER_VIEWER_HOUR = "10" }
+vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", SCORING_URL = "https://plant-scoring-staging.rotopower.workers.dev", PREDICT_TRUSTED = "on", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "10", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", JUMP_NEW_GLOBAL_DAY = "6", WORKORDER_PER_VIEWER_HOUR = "10" }
 
 [[env.staging.ratelimits]]
 name = "API_LIMITER"
@@ -60,7 +61,7 @@ service = "plant-scoring-staging"
 # ------------------------------------------------------------- production
 [env.production]
 name = "plant-dashboard"
-vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", SCORING_URL = "https://plant-scoring.rotopower.workers.dev", PREDICT_TRUSTED = "off", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "5", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", WORKORDER_PER_VIEWER_HOUR = "10" }
+vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", SCORING_URL = "https://plant-scoring.rotopower.workers.dev", PREDICT_TRUSTED = "off", CACHE_SECONDS = "30", DEMO_PER_VIEWER_HOUR = "10", DEMO_GLOBAL_HOUR = "60", SCORE_GLOBAL_DAY = "30", JUMP_NEW_GLOBAL_DAY = "6", WORKORDER_PER_VIEWER_HOUR = "10" }
 
 [[env.production.ratelimits]]
 name = "API_LIMITER"

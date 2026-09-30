@@ -13,12 +13,12 @@ it("main module exports only handlers and functions", () => {
   }
 });
 
-const TAGS = ["PLANT.LOAD", "GT1.EXH_TEMP", "BFP1.FLOW", "BFP2.VIB_DE"];
+const TAGS = ["PLANT.LOAD", "GT1.EXH_TEMP", "BFP1.FLOW", "BFP2.VIB_DE", "TX1.MOISTURE_PPM"]; // last: the sentinel
 const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "");
 
 /** Fake plant API: deterministic values, BFP1 in outage (null) at 2024-07-20. */
-function fakeApi(simHour: string) {
+function fakeApi(simHour: string, tags: string[] = TAGS) {
   const calls: string[] = [];
   const value = (tag: string, ts: string) => (tag === "BFP1.FLOW" && ts.startsWith("2024-07-20") ? null : tag.length + Date.parse(ts + "Z") / HOUR / 1e6);
   const fetcher: Fetcher = async (url, init) => {
@@ -28,7 +28,7 @@ function fakeApi(simHour: string) {
     const u = new URL(url);
     if (u.pathname === "/tags/latest") {
       const values: Record<string, number | null> = {};
-      for (const t of TAGS) values[t] = value(t, simHour);
+      for (const t of tags) values[t] = value(t, simHour);
       return Response.json({ timestamp: simHour, values });
     }
     const m = /^\/tags\/([^/]+)\/history$/.exec(u.pathname);
@@ -126,6 +126,29 @@ describe("ingestOnce", () => {
     expect(other?.value).not.toBeNull();
   });
 
+  it("rewrites hours stored by the 4-asset plant (no sentinel) and fills the gap before them", async () => {
+    // Staging after the full-plant merge: the demo reached 09-15 with all tags; old 4-asset rows
+    // (PLANT.LOAD but no sentinel) start at 09-21 13:00. The jump to 09-22 must fill 09-15..09-21.
+    const wide = { ...testEnv(), MAX_BACKFILL_HOURS: "200" } as Env;
+    await ingestOnce(wide, fakeApi("2024-09-15T00:00:00").fetcher);
+    const old = env.DB.prepare("INSERT INTO readings(tag, ts, value) VALUES (?, ?, 1)");
+    const oldHours = Array.from({ length: 12 }, (_, i) => iso(Date.parse("2024-09-21T13:00:00Z") + i * HOUR));
+    await env.DB.batch(oldHours.flatMap((ts) => ["PLANT.LOAD", "BFP2.VIB_DE"].map((tag) => old.bind(tag, ts))));
+
+    const r = await ingestOnce(wide, fakeApi("2024-09-22T00:00:00").fetcher);
+    expect(r.inserted_latest).toBe(TAGS.length); // 09-22 00:00 had old rows only
+    expect(r.backfilled_hours).toBe(7 * 24 - 1); // 09-15 01:00 .. 09-21 23:00
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE tag = ? AND ts >= '2024-09-15T00:00:00'").bind("GT1.EXH_TEMP").first<{ n: number }>();
+    expect(n?.n).toBe(7 * 24 + 1); // every hour now has the tags the old plant lacked
+    expect(await countRows()).toBe((7 * 24 + 1) * TAGS.length); // old rows replaced, not duplicated
+  });
+
+  it("refuses a plant API without the sentinel tag instead of rewriting a week every pass", async () => {
+    const fourAsset = TAGS.filter((t) => t !== "TX1.MOISTURE_PPM");
+    await expect(ingestOnce(testEnv(), fakeApi("2024-09-01T05:00:00", fourAsset).fetcher)).rejects.toThrow(/no TX1\.MOISTURE_PPM/);
+    expect(await countRows()).toBe(0);
+  });
+
   it("fails loudly when the API rejects the token", async () => {
     const bad = { ...testEnv(), READ_TOKEN: "wrong" } as Env;
     await expect(ingestOnce(bad, fakeApi("2024-09-01T05:00:00").fetcher)).rejects.toThrow(/HTTP 401/);
@@ -149,7 +172,7 @@ describe("http surface", () => {
     expect(r.status).toBe(200);
     const b = (await r.json()) as { last_ingested_hour: string; sentinel_tag: string };
     expect(b.last_ingested_hour).toBe("2024-09-01T05:00:00");
-    expect(b.sentinel_tag).toBe("PLANT.LOAD");
+    expect(b.sentinel_tag).toBe("TX1.MOISTURE_PPM");
   });
 
   it("manual trigger needs the admin token", async () => {

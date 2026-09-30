@@ -114,13 +114,27 @@ Proposal: **drop the index and run staging at speed 30.** A full two-year run of
 ~24 real days; demos jump the clock anyway (+7 days = 168 sim hours x 82 = 13.8k rows, fine).
 
 The index serves only ingest's `ts = ?` / `MAX(ts)` lookups and the open `/health`; those move to the
-primary key through a sentinel tag (`WHERE tag = 'PLANT.LOAD' AND ts ...`), which is always written.
+primary key through a sentinel tag (`WHERE tag = <sentinel> AND ts ...`), which is always written.
+The sentinel is `TX1.MOISTURE_PPM`, written last in each pass (revised 2026-09-29, was `PLANT.LOAD`):
+a full-plant tag, so hours stored by the 4-asset plant have no sentinel and are rewritten with all
+82 tags instead of being skipped.
 
 Scoring reads per pass: 82 tags x lookback. With the GO predict model (7-day slopes) and the anomaly
 baseline (30 days + 20-day minimum + 7-day window), **37 days** of lookback is enough:
 82 x 37 x 24 = ~73k rows per pass. The hourly cron scores at most once per sim day, 24 passes per
 real day at speed 30 = **~1.75M/day (35% of 5M)**, plus capped manual runs from the dashboard
 (30/day, up to ~2.2M more): tight but inside the limit. If it gets close, score every second cron.
+
+**Revision 2026-09-29 (local demo rehearsal).** The table above never added demo jumps to the
+clock's own writes. The scripted demo's five +7-day jumps wrote 68,880 rows the first time, so
+speed 30 (59k/day) plus one first-time demo is ~128k, over 100k. Weeks already stored cost nothing
+(a repeat demo over them wrote 0 rows). Changes:
+
+- **Staging clock paused** (`speed 0`) between demos; the clock only moves by demo jumps. Cron
+  passes then read a row or two and write nothing. The two-year horizon fills as demos reach it.
+- **Dashboard caps jumps into unstored weeks** at `JUMP_NEW_GLOBAL_DAY = 6` per day (~83k rows);
+  jumps over stored weeks and Reset are not capped. Per viewer: `DEMO_PER_VIEWER_HOUR = 10`
+  (the demo uses 7: five jumps and two scoring runs).
 
 ## 6. What each piece needs (Phase 1 work list)
 
@@ -133,7 +147,7 @@ real day at speed 30 = **~1.75M/day (35% of 5M)**, plus capped manual runs from 
 4. `docs/playbook/`: five new files (tube_leak, seal_leak, blade_erosion, winding_overheat,
    oil_degradation); loader and assistant accept 8 modes.
 5. Migration 0005: drop `ix_readings_ts`; ingest and `/health` queries moved to the primary key;
-   staging clock speed 30; scoring `LOOKBACK_DAYS` 37.
+   staging clock paused between demos (was speed 30; section 5 revision); scoring `LOOKBACK_DAYS` 37.
 6. Anomaly: symptom map (`FAILURE_MODES` in `models/anomaly.py` and `score.ts`) for the new modes;
    scoring's `target_assets` from the asset list instead of a constant.
 7. Dashboard: 14 asset cards (grouped: gas turbines, HRSG and steam, pumps, cooling, electrical),
@@ -147,4 +161,4 @@ real day at speed 30 = **~1.75M/day (35% of 5M)**, plus capped manual runs from 
 
 1. Asset and tag table (section 2) and failure-mode signatures (section 3).
 2. The two-year script (section 4).
-3. Budget: drop `ix_readings_ts`, staging at clock speed 30, scoring lookback 37 days (section 5).
+3. Budget: drop `ix_readings_ts`, staging clock paused between demos with a daily cap on jumps into new weeks, scoring lookback 37 days (section 5).

@@ -133,10 +133,10 @@ describe("demo controls", () => {
   });
 
   it("caps demo actions per viewer per hour, and scoring runs per day globally", async () => {
-    for (let i = 0; i < 5; i++) expect((await post("/api/demo/score", {}, "198.51.100.1")).status).toBe(200);
-    const sixth = await post("/api/demo/score", {}, "198.51.100.1");
-    expect(sixth.status).toBe(429);
-    expect((await sixth.json() as { detail: string }).detail).toMatch(/per hour per viewer/);
+    for (let i = 0; i < 10; i++) expect((await post("/api/demo/score", {}, "198.51.100.1")).status).toBe(200); // the demo needs 7
+    const eleventh = await post("/api/demo/score", {}, "198.51.100.1");
+    expect(eleventh.status).toBe(429);
+    expect((await eleventh.json() as { detail: string }).detail).toMatch(/per hour per viewer/);
     expect((await post("/api/demo/score", {}, "198.51.100.2")).status).toBe(200); // another viewer
     const stamp = new Date().toISOString();
     await env.DB.batch(Array.from({ length: 30 }, (_, i) => env.DB.prepare("INSERT INTO demo_actions(kind, viewer, ts) VALUES ('score', ?, ?)").bind(`v${i}`, stamp)));
@@ -145,6 +145,25 @@ describe("demo controls", () => {
     expect((await capped.json() as { detail: string }).detail).toMatch(/per day/);
     const viewers = await env.DB.prepare("SELECT DISTINCT viewer FROM demo_actions WHERE viewer NOT LIKE 'v%'").all<{ viewer: string }>();
     expect(viewers.results.every((v) => /^[0-9a-f]{16}$/.test(v.viewer))).toBe(true); // hashed, never the IP
+  });
+
+  it("caps jumps into unstored weeks per day (D1 writes); jumps over stored weeks stay free", async () => {
+    const stored = env.DB.prepare("INSERT OR REPLACE INTO readings(tag, ts, value) VALUES ('TX1.MOISTURE_PPM', ?, 1)");
+    await env.DB.prepare("DELETE FROM readings").run();
+    await stored.bind("2024-09-27T13:00:00").run(); // ingest already has the week after 09-20
+    expect((await post("/api/demo/jump7", {}, "198.51.100.9")).status).toBe(200);
+    const kinds = await env.DB.prepare("SELECT kind FROM demo_actions WHERE kind LIKE 'jump%'").all<{ kind: string }>();
+    expect(kinds.results.map((k) => k.kind)).toEqual(["jump_stored"]);
+
+    const stamp = new Date().toISOString();
+    await env.DB.batch(Array.from({ length: 6 }, (_, i) => env.DB.prepare("INSERT INTO demo_actions(kind, viewer, ts) VALUES ('jump', ?, ?)").bind(`j${i}`, stamp)));
+    const capped = await post("/api/demo/jump7", {}, "198.51.100.9"); // 10-04 is not stored
+    expect(capped.status).toBe(429);
+    expect((await capped.json() as { detail: string }).detail).toMatch(/new weeks are capped at 6 per day/);
+
+    await stored.bind("2024-10-04T13:00:00").run();
+    expect((await post("/api/demo/jump7", {}, "198.51.100.9")).status).toBe(200); // stored: not capped
+    await env.DB.prepare("DELETE FROM readings").run();
   });
 
   it("unknown actions are 404", async () => {

@@ -46,11 +46,15 @@ export interface Env {
   DEMO_PER_VIEWER_HOUR?: string;
   DEMO_GLOBAL_HOUR?: string;
   SCORE_GLOBAL_DAY?: string;
+  /** Jumps into weeks ingest has not stored yet, across all viewers, per day (D1 write budget). */
+  JUMP_NEW_GLOBAL_DAY?: string;
   WORKORDER_PER_VIEWER_HOUR?: string;
 }
 
 const UA = "plant-dashboard/0.1 (+https://github.com/RotoPower/learn-cognitive-maintenance)";
 const DAY_MS = 86_400_000;
+/** apps/ingest's "hour is stored" tag; keep the two in step. */
+const INGEST_SENTINEL = "TX1.MOISTURE_PPM";
 const HORIZON_START = Date.parse("2024-01-01T00:00:00Z");
 
 class HttpError extends Error {
@@ -291,7 +295,7 @@ async function spend(env: Env, viewer: string, kind: string): Promise<void> {
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
   const dayAgo = new Date(Date.now() - DAY_MS).toISOString();
   const isWo = kind === "workorder";
-  const perViewer = Number(isWo ? env.WORKORDER_PER_VIEWER_HOUR ?? 10 : env.DEMO_PER_VIEWER_HOUR ?? 5);
+  const perViewer = Number(isWo ? env.WORKORDER_PER_VIEWER_HOUR ?? 10 : env.DEMO_PER_VIEWER_HOUR ?? 10);
   const mine = await env.DB.prepare(`SELECT COUNT(*) AS n FROM demo_actions WHERE viewer = ? AND ts >= ? AND ${isWo ? "kind = 'workorder'" : "kind <> 'workorder'"}`)
     .bind(viewer, hourAgo).first<{ n: number }>();
   if ((mine?.n ?? 0) >= perViewer) throw new HttpError(429, `limit reached: ${perViewer} ${isWo ? "work orders" : "demo actions"} per hour per viewer`);
@@ -299,6 +303,11 @@ async function spend(env: Env, viewer: string, kind: string): Promise<void> {
     const all = await env.DB.prepare("SELECT COUNT(*) AS n FROM demo_actions WHERE kind <> 'workorder' AND ts >= ?").bind(hourAgo).first<{ n: number }>();
     const cap = Number(env.DEMO_GLOBAL_HOUR ?? 60);
     if ((all?.n ?? 0) >= cap) throw new HttpError(429, `the demo is busy: ${cap} actions per hour across all viewers`);
+  }
+  if (kind === "jump") {
+    const j = await env.DB.prepare("SELECT COUNT(*) AS n FROM demo_actions WHERE kind = 'jump' AND ts >= ?").bind(dayAgo).first<{ n: number }>();
+    const cap = Number(env.JUMP_NEW_GLOBAL_DAY ?? 6);
+    if ((j?.n ?? 0) >= cap) throw new HttpError(429, `jumps into new weeks are capped at ${cap} per day (database write budget); jumps over stored weeks and Reset still work`);
   }
   if (kind === "score") {
     const s = await env.DB.prepare("SELECT COUNT(*) AS n FROM demo_actions WHERE kind = 'score' AND ts >= ?").bind(dayAgo).first<{ n: number }>();
@@ -385,7 +394,10 @@ export async function demo(env: Env, req: Request, action: string) {
     if (target <= now) throw new HttpError(422, "the clock only moves forward; use Reset to start over");
     target = Math.min(target, end);
     if (target <= now) throw new HttpError(422, "already at the end of the simulated period; use Reset");
-    await spend(env, viewer, "jump");
+    // A week ingest has not stored yet costs ~13.8k D1 writes (82 tags x 168 h); one it has costs none.
+    const hour = iso(Math.floor(target / 3_600_000) * 3_600_000);
+    const stored = await env.DB.prepare("SELECT 1 AS n FROM readings WHERE tag = ? AND ts = ?").bind(INGEST_SENTINEL, hour).first();
+    await spend(env, viewer, stored ? "jump_stored" : "jump");
     result = await upstream(env, "plant", "/clock/jump", { method: "POST", body: { to: iso(target) }, admin: true });
   } else if (action === "score") {
     await spend(env, viewer, "score");
