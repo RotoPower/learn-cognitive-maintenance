@@ -7,7 +7,7 @@ API and upserts one row per tag into the shared D1 table `readings`, keyed on
 continuous hourly history. Speed 3600 is one sim *hour per real second*.
 
 If the sim clock jumped (dashboard "Jump +7 days") the gap is backfilled from
-`/tags/{tag}/history`, up to `MAX_BACKFILL_HOURS` (default 168).
+`/tags/{tag}/history`, up to `MAX_BACKFILL_HOURS` (default 168). With 82 tags a gap is filled `BACKFILL_TAGS_PER_PASS` (default 20) tags per cron pass, so a full 168 h takes 5 minutes: one pass may make at most 50 subrequests on the free plan (each history call and each D1 batch counts; one pass per tag failed with "Too many subrequests" on staging, 2026-10-01).
 
 - `GET /health`: last ingested hour of the sentinel tag `TX1.MOISTURE_PPM` (open).
 - `POST /ingest`: run one pass now (ADMIN token). The dashboard's demo controls use this.

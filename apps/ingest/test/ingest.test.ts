@@ -118,6 +118,49 @@ describe("ingestOnce", () => {
     expect(again.calls.length).toBe(1);
   });
 
+  it("fills a gap for 82 tags over several passes, each within the 50-subrequest budget", async () => {
+    // Staging failed with "Too many subrequests" when one pass made a history call per tag (82) and
+    // 138 D1 batches. Count what a pass may call: plant API fetches + D1 round trips (batches, queries).
+    const many = Array.from({ length: 81 }, (_, i) => `A${String(i).padStart(2, "0")}.T`).concat("TX1.MOISTURE_PPM");
+    await ingestOnce(testEnv(), fakeApi("2024-09-01T00:00:00", many).fetcher);
+    let batches = 0, queries = 0;
+    const counted = new Proxy(env.DB, {
+      get(target, prop, recv) {
+        const v = Reflect.get(target, prop, target);
+        if (prop === "batch") return (...a: unknown[]) => { batches++; return (v as Function).apply(target, a); };
+        if (prop === "prepare") return (...a: unknown[]) => {
+          const st = (v as Function).apply(target, a);
+          for (const m of ["first", "all", "run"] as const) {
+            const orig = st[m].bind(st);
+            st[m] = (...x: unknown[]) => { queries++; return orig(...x); };
+          }
+          const bind = st.bind.bind(st);
+          st.bind = (...x: unknown[]) => { const b = bind(...x); for (const m of ["first", "all", "run"] as const) { const o = b[m].bind(b); b[m] = (...y: unknown[]) => { queries++; return o(...y); }; } return b; };
+          return st;
+        };
+        return v;
+      },
+    });
+    const e = { ...testEnv(), DB: counted } as Env;
+    let pending = Infinity, passes = 0;
+    while (pending > 0 && passes < 10) {
+      batches = 0; queries = 0;
+      const api = fakeApi("2024-09-08T00:00:00", many);
+      const r = await ingestOnce(e, api.fetcher);
+      passes++;
+      pending = r.backfill_tags_pending;
+      expect(api.calls.length + batches + queries, `pass ${passes}`).toBeLessThanOrEqual(50);
+    }
+    expect(passes).toBe(5); // 82 tags, 20 per pass
+    const sentinelRows = await env.DB.prepare("SELECT COUNT(*) AS n FROM readings WHERE tag = 'TX1.MOISTURE_PPM'").first<{ n: number }>();
+    expect(sentinelRows?.n).toBe(7 * 24 + 1); // 09-01 00:00 .. 09-08 00:00 hourly, written once the last chunk is in
+    expect(await countRows()).toBe(many.length * (7 * 24 + 1));
+    // all done: the next pass in the same hour makes no history calls
+    const again = fakeApi("2024-09-08T00:00:00", many);
+    await ingestOnce(e, again.fetcher);
+    expect(again.calls.length).toBe(1);
+  });
+
   it("stores outage readings as NULL", async () => {
     await ingestOnce(testEnv(), fakeApi("2024-07-20T03:00:00").fetcher);
     const row = await env.DB.prepare("SELECT value FROM readings WHERE tag='BFP1.FLOW'").first<{ value: number | null }>();

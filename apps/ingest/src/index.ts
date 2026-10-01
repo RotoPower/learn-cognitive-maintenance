@@ -33,6 +33,10 @@ export interface Env {
   MAX_BACKFILL_HOURS?: string;
   /** Hours of history to seed when the readings table is empty (default 168). */
   INITIAL_BACKFILL_HOURS?: string;
+  /** Tags backfilled per pass (default 20). Every history call and every D1 batch is a subrequest and a
+   *  Worker invocation may make only 50 on the free plan: 82 tags in one pass fail with "Too many
+   *  subrequests". A gap is filled over several cron passes, 20 tags at a time. */
+  BACKFILL_TAGS_PER_PASS?: string;
 }
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
@@ -69,6 +73,8 @@ export interface IngestResult {
   backfilled_hours: number;
   backfilled_rows: number;
   skipped_backfill_hours: number;
+  /** Tags whose backfill is still to do (they continue on the next passes). */
+  backfill_tags_pending: number;
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "");
@@ -87,8 +93,9 @@ async function upsert(env: Env, rows: { tag: string; ts: string; value: number |
   rows = [...rows.filter((r) => r.tag !== SENTINEL), ...rows.filter((r) => r.tag === SENTINEL)];
   const stmt = env.DB.prepare("INSERT OR REPLACE INTO readings(tag, ts, value) VALUES (?, ?, ?)");
   // D1 batches are transactional and accept many statements; chunk to stay well under limits.
-  for (let i = 0; i < rows.length; i += 100) {
-    await env.DB.batch(rows.slice(i, i + 100).map((r) => stmt.bind(r.tag, r.ts, r.value)));
+  // 250 statements per batch: a batch is one subrequest (50 per invocation on the free plan).
+  for (let i = 0; i < rows.length; i += 250) {
+    await env.DB.batch(rows.slice(i, i + 250).map((r) => stmt.bind(r.tag, r.ts, r.value)));
   }
   return rows.length;
 }
@@ -113,24 +120,37 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
   // Backfill: hours strictly between the previously newest row and this hour. On the
   // very first run (empty table) seed the trailing INITIAL_BACKFILL_HOURS so dashboards
   // have a trend from day one.
-  let backfilledHours = 0, backfilledRows = 0, skipped = 0;
+  let backfilledHours = 0, backfilledRows = 0, skipped = 0, pendingAfter = 0;
   const prev = await env.DB.prepare("SELECT MAX(ts) AS ts FROM readings WHERE tag = ? AND ts < ?").bind(SENTINEL, simHour).first<{ ts: string | null }>();
   const maxHours = Number(env.MAX_BACKFILL_HOURS ?? 168);
   const gapHours = prev?.ts ? Math.round((ms(simHour) - ms(prev.ts)) / HOUR_MS) - 1 : Number(env.INITIAL_BACKFILL_HOURS ?? 168);
-  {
-    if (gapHours > 0) {
-      const hours = Math.min(gapHours, maxHours);
-      skipped = gapHours - hours;
-      const from = iso(ms(simHour) - hours * HOUR_MS);
-      const to = iso(ms(simHour) - HOUR_MS);
-      const rows: { tag: string; ts: string; value: number | null }[] = [];
-      for (const tag of tags) {
-        const h = await api<History>(env, fetcher, `/tags/${encodeURIComponent(tag)}/history?from=${from}&to=${to}&interval=1h`);
-        for (const p of h.points) rows.push({ tag, ts: p.timestamp, value: p.value });
-      }
-      backfilledRows = await upsert(env, rows);
-      backfilledHours = hours;
+  if (gapHours > 0) {
+    const hours = Math.min(gapHours, maxHours);
+    skipped = gapHours - hours;
+    const from = iso(ms(simHour) - hours * HOUR_MS);
+    const to = iso(ms(simHour) - HOUR_MS);
+    // A tag is backfilled once its rows at `from` and `to` both exist: each tag's rows are written in time
+    // order, so `to` means complete, and `from` rejects tags that only hold a later stretch (the old 4-asset
+    // plant). The sentinel goes in the last chunk only, so `prev` keeps pointing at the gap until all tags
+    // are done and a failed pass is simply retried.
+    const done = new Set<string>();
+    for (let i = 0; i < tags.length; i += 90) {
+      const part = tags.slice(i, i + 90);
+      const found = await env.DB.prepare(`SELECT tag FROM readings WHERE ts IN (?, ?) AND tag IN (${part.map(() => "?").join(",")}) GROUP BY tag HAVING COUNT(*) = 2`)
+        .bind(from, to, ...part).all<{ tag: string }>();
+      for (const f of found.results) done.add(f.tag);
     }
+    const pending = [...tags.filter((t) => t !== SENTINEL && !done.has(t)), ...(done.has(SENTINEL) ? [] : [SENTINEL])];
+    const perPass = Math.max(1, Number(env.BACKFILL_TAGS_PER_PASS ?? 20));
+    const chunk = pending.slice(0, perPass);
+    pendingAfter = pending.length - chunk.length;
+    const rows: { tag: string; ts: string; value: number | null }[] = [];
+    for (const tag of chunk) {
+      const h = await api<History>(env, fetcher, `/tags/${encodeURIComponent(tag)}/history?from=${from}&to=${to}&interval=1h`);
+      for (const p of h.points) rows.push({ tag, ts: p.timestamp, value: p.value });
+    }
+    backfilledRows = await upsert(env, rows);
+    backfilledHours = hours;
   }
 
   return {
@@ -139,6 +159,7 @@ export async function ingestOnce(env: Env, injected?: Fetcher): Promise<IngestRe
     backfilled_hours: backfilledHours,
     backfilled_rows: backfilledRows,
     skipped_backfill_hours: skipped,
+    backfill_tags_pending: pendingAfter,
   };
 }
 
