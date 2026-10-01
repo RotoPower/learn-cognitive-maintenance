@@ -18,7 +18,7 @@ CACHE_SECONDS = "30"
 DEMO_PER_VIEWER_HOUR = "10"                   # the scripted demo needs 7 (5 jumps + 2 scoring runs)
 DEMO_GLOBAL_HOUR = "60"
 SCORE_GLOBAL_DAY = "30"
-JUMP_NEW_GLOBAL_DAY = "6"                     # jumps into unstored weeks: 6 x ~13.8k = 83k of 100k D1 writes/day
+JUMP_NEW_GLOBAL_DAY = "2"                     # jumps into unstored weeks: 2 x ~27.6k = 55k of 100k D1 writes/day (pre-fill: scripts/prefill_staging.py)
 WORKORDER_PER_VIEWER_HOUR = "10"
 
 # Secrets: READ_TOKEN, ADMIN_TOKEN (plant API), SCORING_ADMIN_TOKEN (scoring POST /score;

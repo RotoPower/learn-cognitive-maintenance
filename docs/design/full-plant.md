@@ -132,9 +132,20 @@ speed 30 (59k/day) plus one first-time demo is ~128k, over 100k. Weeks already s
 
 - **Staging clock paused** (`speed 0`) between demos; the clock only moves by demo jumps. Cron
   passes then read a row or two and write nothing. The two-year horizon fills as demos reach it.
-- **Dashboard caps jumps into unstored weeks** at `JUMP_NEW_GLOBAL_DAY = 6` per day (~83k rows);
+- **Dashboard caps jumps into unstored weeks** at `JUMP_NEW_GLOBAL_DAY = 6` per day (~83k rows; **see the 2026-10-01 revision: now 2**);
   jumps over stored weeks and Reset are not capped. Per viewer: `DEMO_PER_VIEWER_HOUR = 10`
   (the demo uses 7: five jumps and two scoring runs).
+
+**Revision 2026-10-01 (staging rehearsal after the merge).** Two corrections:
+
+- **D1 counts the primary-key index entry**, so a reading is 2 rows written, not 1 (two new weeks took
+  `rows_written_24h` from 8.8k to 63.4k). A new week is ~27.6k writes, speed 30 is ~118k/day (over), and
+  `JUMP_NEW_GLOBAL_DAY` is now **2** (~55k). Staging stays paused.
+- **One ingest pass may make 50 subrequests** (free plan; Miniflare does not enforce it). A 82-tag backfill
+  (one history call per tag + 138 batches) failed with "Too many subrequests". Backfill now takes 20 tags per
+  pass (`BACKFILL_TAGS_PER_PASS`), D1 batches hold 250 statements, the cron runs every 10 minutes, and the
+  demo weeks are pre-filled one week per UTC day with `scripts/prefill_staging.py` (budget guard: stops when
+  another week would pass 90k writes in 24 h). Weeks already stored cost nothing, so the demo itself writes 0.
 
 ## 6. What each piece needs (Phase 1 work list)
 

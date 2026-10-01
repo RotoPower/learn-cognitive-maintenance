@@ -6,7 +6,7 @@ main = "src/index.ts"
 compatibility_date = "2025-06-01"
 
 [triggers]
-crons = ["* * * * *"]
+crons = ["*/10 * * * *"]
 
 [vars]
 PLANT_API_URL = "http://127.0.0.1:8787"       # wrangler dev of apps/plant-api
@@ -27,7 +27,7 @@ name = "plant-ingest-staging"
 vars = { PLANT_API_URL = "https://plant-api-staging.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168", INITIAL_BACKFILL_HOURS = "168" }
 
 [env.staging.triggers]
-crons = ["* * * * *"]
+crons = ["*/10 * * * *"]
 
 [[env.staging.d1_databases]]
 binding = "DB"
@@ -46,7 +46,7 @@ name = "plant-ingest"
 vars = { PLANT_API_URL = "https://plant-api.rotopower.workers.dev", MAX_BACKFILL_HOURS = "168", INITIAL_BACKFILL_HOURS = "168" }
 
 [env.production.triggers]
-crons = ["* * * * *"]
+crons = ["*/10 * * * *"]
 
 [[env.production.d1_databases]]
 binding = "DB"

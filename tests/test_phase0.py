@@ -64,3 +64,37 @@ def test_step1_refuses_a_bulk_delete_without_the_flag(monkeypatch):
     calls.clear()
     P.step1_delete_junk({"allow_bulk_delete": True})
     assert any(s.startswith("DELETE") for s in calls)
+
+
+# ---- scripts/prefill_staging.py (D1 free-tier pacing)
+
+
+def _prefill():
+
+    spec = importlib.util.spec_from_file_location("prefill_staging", Path(__file__).resolve().parents[1] / "scripts" / "prefill_staging.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_prefill_reads_rows_written_with_either_thousands_separator():
+    m = _prefill()
+    assert m.rows_written_24h("│ rows_written_24h      │ 63.401  │") == 63401
+    assert m.rows_written_24h("rows_written_24h | 8,781") == 8781
+    with pytest.raises(ValueError):
+        m.rows_written_24h("nothing here")
+
+
+def test_prefill_stops_before_the_daily_write_limit():
+    m = _prefill()
+    assert m.WEEK_WRITES == 27_552  # 82 tags x 168 h x 2 (row + primary-key index entry)
+    assert m.weeks_that_fit(63_401, 90_000, 3) == 0  # the rehearsal state: no room left for a week
+    assert m.weeks_that_fit(0, 90_000, 3) == 3
+    assert m.weeks_that_fit(8_781, 90_000, 5) == 2
+
+
+def test_prefill_next_target_is_a_week_capped_at_the_end():
+    m = _prefill()
+    assert m.next_target("2024-08-25T00:00:00", "2024-09-22T00:00:00") == "2024-09-01T00:00:00"
+    assert m.next_target("2024-09-18T00:00:00", "2024-09-22T00:00:00") == "2024-09-22T00:00:00"
+    assert m.next_target("2024-09-22T00:00:00", "2024-09-22T00:00:00") is None

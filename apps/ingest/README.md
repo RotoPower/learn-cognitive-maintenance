@@ -1,13 +1,13 @@
 # plant-ingest (Cloudflare Worker)
 
-Cron Worker (module D2.2). Every real minute it reads `/tags/latest` from the plant
+Cron Worker (module D2.2). Every 10 real minutes (`*/10`, 2026-10-01; it was every minute) it reads `/tags/latest` from the plant
 API and upserts one row per tag into the shared D1 table `readings`, keyed on
 `(tag, ts)` so repeated runs within the same sim hour are no-ops. At clock speed
 30 (sim seconds per real second: two real minutes = one sim hour) this yields a
 continuous hourly history. Speed 3600 is one sim *hour per real second*.
 
 If the sim clock jumped (dashboard "Jump +7 days") the gap is backfilled from
-`/tags/{tag}/history`, up to `MAX_BACKFILL_HOURS` (default 168). With 82 tags a gap is filled `BACKFILL_TAGS_PER_PASS` (default 20) tags per cron pass, so a full 168 h takes 5 minutes: one pass may make at most 50 subrequests on the free plan (each history call and each D1 batch counts; one pass per tag failed with "Too many subrequests" on staging, 2026-10-01).
+`/tags/{tag}/history`, up to `MAX_BACKFILL_HOURS` (default 168). With 82 tags a gap is filled `BACKFILL_TAGS_PER_PASS` (default 20) tags per cron pass, so a full 168 h takes 5 passes (50 minutes by cron; `scripts/prefill_staging.py` drives them by hand through `POST /ingest`): one pass may make at most 50 subrequests on the free plan (each history call and each D1 batch counts; one pass per tag failed with "Too many subrequests" on staging, 2026-10-01).
 
 - `GET /health`: last ingested hour of the sentinel tag `TX1.MOISTURE_PPM` (open).
 - `POST /ingest`: run one pass now (ADMIN token). The dashboard's demo controls use this.
@@ -59,17 +59,21 @@ fails halfway leaves the hour unmarked; and it is a full-plant tag, so hours sto
 4-asset plant (24 tags, no sentinel) are rewritten with all 82 tags when the clock passes them.
 A plant API without the sentinel is refused (every pass would otherwise rewrite a week).
 
-| speed | sim hours / real day | rows written / day | two sim years take |
+| speed | sim hours / real day | D1 rows written / day (2 per reading) | two sim years take |
 |---|---|---|---|
-| 3600 | 86,400 | ~7M, limit gone in ~20 min | ~5 h |
-| 60 | 1,440 | ~118k, over the limit | ~12 days |
-| 30 | 720 | ~59k (59%) | ~24 days |
-| **0** (staging) | demo jumps only | ~13.8k per jump into a new week, 0 over a stored one | as demos reach it |
+| 3600 | 86,400 | ~14M, limit gone in ~10 min | ~5 h |
+| 60 | 1,440 | ~236k, over the limit | ~12 days |
+| 30 | 720 | ~118k, **over the limit** | ~24 days |
+| **0** (staging) | demo jumps only | ~27.6k per jump into a new week, 0 over a stored one | as demos reach it |
+
+**Correction 2026-10-01:** D1 counts the primary-key index entry as a written row, so a reading costs 2, not 1
+(measured: two new weeks raised `rows_written_24h` from 8.8k to 63.4k). Speed 30 is therefore over the free
+tier as well; staging stays at speed 0.
 
 A demo "Jump +7 days" backfills at most `MAX_BACKFILL_HOURS` (168 h). The scripted demo's
-five jumps wrote 68,880 rows the first time and 0 on a repeat (rehearsal, 2026-09-29), so
-speed 30 plus one first-time demo would pass 100k: staging runs paused, and the dashboard caps
-jumps into unstored weeks at `JUMP_NEW_GLOBAL_DAY` (6/day). When the clock is paused or
+five jumps wrote 68,880 rows (~138k D1 writes) the first time and 0 on a repeat (rehearsal, 2026-09-29): staging runs
+paused, the dashboard caps jumps into unstored weeks at `JUMP_NEW_GLOBAL_DAY` (2/day, ~55k writes), and the demo
+weeks are pre-filled one week per day with `scripts/prefill_staging.py` so the demo itself writes nothing. When the clock is paused or
 clamped at the horizon end, the current hour is already stored and a pass writes nothing.
 
 ## Deploys

@@ -164,10 +164,10 @@ describe("demo controls", () => {
     expect(kinds.results.map((k) => k.kind)).toEqual(["jump_stored"]);
 
     const stamp = new Date().toISOString();
-    await env.DB.batch(Array.from({ length: 6 }, (_, i) => env.DB.prepare("INSERT INTO demo_actions(kind, viewer, ts) VALUES ('jump', ?, ?)").bind(`j${i}`, stamp)));
+    await env.DB.batch(Array.from({ length: 2 }, (_, i) => env.DB.prepare("INSERT INTO demo_actions(kind, viewer, ts) VALUES ('jump', ?, ?)").bind(`j${i}`, stamp)));
     const capped = await post("/api/demo/jump7", {}, "198.51.100.9"); // 10-04 is not stored
     expect(capped.status).toBe(429);
-    expect((await capped.json() as { detail: string }).detail).toMatch(/new weeks are capped at 6 per day/);
+    expect((await capped.json() as { detail: string }).detail).toMatch(/new weeks are capped at 2 per day/);
 
     await stored.bind("2024-10-04T13:00:00").run();
     expect((await post("/api/demo/jump7", {}, "198.51.100.9")).status).toBe(200); // stored: not capped

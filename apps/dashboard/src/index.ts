@@ -316,7 +316,7 @@ async function spend(env: Env, viewer: string, kind: string): Promise<void> {
   }
   if (kind === "jump") {
     const j = await env.DB.prepare("SELECT COUNT(*) AS n FROM demo_actions WHERE kind = 'jump' AND ts >= ?").bind(dayAgo).first<{ n: number }>();
-    const cap = Number(env.JUMP_NEW_GLOBAL_DAY ?? 6);
+    const cap = Number(env.JUMP_NEW_GLOBAL_DAY ?? 2);
     if ((j?.n ?? 0) >= cap) throw new HttpError(429, `jumps into new weeks are capped at ${cap} per day (database write budget); jumps over stored weeks and Reset still work`);
   }
   if (kind === "score") {
@@ -404,7 +404,7 @@ export async function demo(env: Env, req: Request, action: string) {
     if (target <= now) throw new HttpError(422, "the clock only moves forward; use Reset to start over");
     target = Math.min(target, end);
     if (target <= now) throw new HttpError(422, "already at the end of the simulated period; use Reset");
-    // A week ingest has not stored yet costs ~13.8k D1 writes (82 tags x 168 h); one it has costs none.
+    // A week ingest has not stored yet costs ~27.6k D1 writes (82 tags x 168 h x 2: D1 counts the primary-key index entry); one it has costs none.
     const hour = iso(Math.floor(target / 3_600_000) * 3_600_000);
     const stored = await env.DB.prepare("SELECT 1 AS n FROM readings WHERE tag = ? AND ts = ?").bind(INGEST_SENTINEL, hour).first();
     await spend(env, viewer, stored ? "jump_stored" : "jump");
